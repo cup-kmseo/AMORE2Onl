@@ -4,7 +4,6 @@ set ( TEST_SOURCES
 
 foreach ( src ${TEST_SOURCES} )
     get_filename_component ( test_name ${src} NAME_WE )
-
     add_executable ( ${test_name} ${src} )
 
     target_include_directories ( ${test_name}

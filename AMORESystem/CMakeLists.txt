@@ -1,61 +1,65 @@
-set ( MODULE_NAME AMORESystem )
-message ( STATUS "Configuring ${MODULE_NAME} ..." )
+set(MODULE_NAME AMORESystem)
+message(STATUS "Configuring ${MODULE_NAME} ...")
 
 # Sources (normal .cc)
-file ( GLOB MODULE_HEADERS ${MODULE_NAME}/*.hh )
-file ( GLOB MODULE_SOURCES src/*.cc )
+file(GLOB MODULE_HEADERS ${MODULE_NAME}/*.hh)
+file(GLOB MODULE_SOURCES src/*.cc)
 
-# --- Collect include dirs for dictionary (from OnlConsts INTERFACE) ---
-set ( DICT_I_FLAGS
+# --- Collect include dirs for dictionary ---
+# IMPORTANT: Paths to CUPDAQ modules must now include the 'CUPDAQ/' prefix.
+# AMORE module is native to AMORE2Onl, so its path remains unchanged.
+set(DICT_I_FLAGS
     -I${LIBUSB_INCLUDE_DIRS}
-    -I${CMAKE_SOURCE_DIR}/OnlConsts
-    -I${CMAKE_SOURCE_DIR}/Notice
-    -I${CMAKE_SOURCE_DIR}/DAQUtils
-    -I${CMAKE_SOURCE_DIR}/DAQSystem
-    -I${CMAKE_SOURCE_DIR}/DAQConfig
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/OnlConsts
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/Notice
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQUtils
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQSystem
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQConfig
     -I${CMAKE_SOURCE_DIR}/AMORE
 )
 
-# Generate ROOT dictionary for only the two headers above
-ROOT_GENERATE_DICTIONARY ( G__${MODULE_NAME}
+# Generate ROOT dictionary for the headers
+ROOT_GENERATE_DICTIONARY(G__${MODULE_NAME}
     ${MODULE_HEADERS}
     LINKDEF ${MODULE_NAME}/LinkDef.h
     OPTIONS ${DICT_I_FLAGS} -Wno-inconsistent-missing-override
 )
 
 # Build shared library (add dictionary source)
-add_library ( ${MODULE_NAME} SHARED
+add_library(${MODULE_NAME} SHARED
     ${MODULE_SOURCES}
     G__${MODULE_NAME}.cxx
 )
 
 # Include paths
-target_include_directories ( ${MODULE_NAME}
+target_include_directories(${MODULE_NAME}
     PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     ${ROOT_INCLUDE_DIRS}
 )
 
-# Link ROOT and apply its compile defs
-target_link_libraries ( ${MODULE_NAME}
+# Link ROOT and submodule targets
+target_link_libraries(${MODULE_NAME}
     PUBLIC
     ${ROOT_LIBRARIES}
+    OnlConsts
     Notice
     DAQConfig
     DAQSystem
+    DAQConfig
     AMORE
 )
 
 # ---- Install ----
-install ( TARGETS ${MODULE_NAME}
+install(TARGETS ${MODULE_NAME}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
-install ( DIRECTORY ${MODULE_NAME}/
+install(DIRECTORY ${MODULE_NAME}/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${MODULE_NAME}
     FILES_MATCHING PATTERN "*.hh"
 )
-install ( FILES
+install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/lib${MODULE_NAME}_rdict.pcm
     ${CMAKE_CURRENT_BINARY_DIR}/lib${MODULE_NAME}.rootmap
     DESTINATION ${CMAKE_INSTALL_LIBDIR}

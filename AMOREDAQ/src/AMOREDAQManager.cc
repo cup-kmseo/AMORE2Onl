@@ -51,12 +51,12 @@ bool AMOREDAQManager::AddADC(AbsConfList * conflist)
 
 bool AMOREDAQManager::ReadConfig()
 {
-  if (fConfigFilename.IsNull()) {
+  if (fConfigFilename.empty()) {
     ERROR("config filename is empty");
     return false;
   }
 
-  std::string filename(fConfigFilename.Data());
+  std::string filename = fConfigFilename;
 
   try {
     YAML::Node node = YAML::LoadFile(filename.c_str());

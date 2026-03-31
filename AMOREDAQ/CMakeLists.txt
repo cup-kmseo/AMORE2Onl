@@ -5,30 +5,29 @@ message ( STATUS "Configuring ${MODULE_NAME} ..." )
 file ( GLOB MODULE_HEADERS ${MODULE_NAME}/*.hh )
 file ( GLOB MODULE_SOURCES src/*.cc )
 
-# --- Collect include dirs for dictionary (from OnlConsts INTERFACE) ---
+# --- Collect include dirs for dictionary ---
+# IMPORTANT:
+# 1. Paths to CUPDAQ modules must now include the 'CUPDAQ/' prefix.
+# 2. HDF5 is now a REQUIRED dependency, so conditional checks are removed.
 set ( DICT_I_FLAGS
     -I${LIBUSB_INCLUDE_DIRS}
-    -I${CMAKE_SOURCE_DIR}/OnlConsts
-    -I${CMAKE_SOURCE_DIR}/Notice
-    -I${CMAKE_SOURCE_DIR}/OnlObjs
-    -I${CMAKE_SOURCE_DIR}/RawObjs
-    -I${CMAKE_SOURCE_DIR}/DAQUtils
-    -I${CMAKE_SOURCE_DIR}/DAQSystem
-    -I${CMAKE_SOURCE_DIR}/DAQConfig
-    -I${CMAKE_SOURCE_DIR}/DAQTrigger
-    -I${CMAKE_SOURCE_DIR}/DAQ
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/OnlConsts
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/Notice
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/OnlObjs
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/RawObjs
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQUtils
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQSystem
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQConfig
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQTrigger
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQ
+    -I${CMAKE_SOURCE_DIR}/CUPDAQ/HDF5Utils
     -I${CMAKE_SOURCE_DIR}/AMORE
     -I${CMAKE_SOURCE_DIR}/AMORESystem
     -I${CMAKE_SOURCE_DIR}/AMOREAlgs
-    
+    -I${HDF5_INCLUDE_DIRS}
 )
 
-if ( CUPDAQ_ENABLE_HDF5 )
-    list ( APPEND DICT_I_FLAGS -I${HDF5_INCLUDE_DIRS} )
-    list ( APPEND DICT_I_FLAGS -I${CMAKE_SOURCE_DIR}/HDF5Utils )
-endif ()
-
-# Generate ROOT dictionary for only the two headers above
+# Generate ROOT dictionary for the headers
 ROOT_GENERATE_DICTIONARY ( G__${MODULE_NAME}
     ${MODULE_HEADERS}
     LINKDEF ${MODULE_NAME}/LinkDef.h
@@ -47,17 +46,16 @@ target_include_directories ( ${MODULE_NAME}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     ${ROOT_INCLUDE_DIRS}
+    ${HDF5_INCLUDE_DIRS}
 )
 
-if ( CUPDAQ_ENABLE_HDF5 )
-    target_include_directories ( ${MODULE_NAME} PUBLIC ${HDF5_INCLUDE_DIRS} )
-endif ()
-
-# Link ROOT and apply its compile defs
+# Link ROOT, submodule targets, and apply its compile defs
 target_link_libraries ( ${MODULE_NAME}
     PUBLIC
     yaml-cpp
+    cppzmq
     ${ROOT_LIBRARIES}
+    ${HDF5_LIBRARIES}
     OnlConsts
     Notice
     OnlObjs
@@ -67,14 +65,11 @@ target_link_libraries ( ${MODULE_NAME}
     DAQConfig
     DAQTrigger
     DAQ
+    HDF5Utils
     AMORE
-    AMORESystem    
+    AMORESystem
     AMOREAlgs
 )
-
-if ( CUPDAQ_ENABLE_HDF5 )
-    target_link_libraries ( ${MODULE_NAME} PUBLIC ${HDF5_LIBRARIES} HDF5Utils )
-endif ()
 
 target_compile_definitions ( ${MODULE_NAME}
     PUBLIC
