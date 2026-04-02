@@ -7,22 +7,22 @@
 #include "AMORESystem/AMOREADCConf.hh"
 #include "DAQUtils/ConcurrentDeque.hh"
 
-struct AMOREChunk {
+struct Chunk {
   std::vector<unsigned long> fTime;
   std::vector<std::vector<unsigned int>> fADC;
 
-  AMOREChunk(int nch, int ndp)
+  Chunk(int nch, int ndp)
   {
     fTime.resize(ndp);
     fADC.assign(nch, std::vector<unsigned int>(ndp));
   }
 };
 
-class AMOREChunkFIFO {
+class ChunkDataFIFO {
 public:
-  AMOREChunkFIFO();
-  AMOREChunkFIFO(int nch, int head, int tail);
-  virtual ~AMOREChunkFIFO() = default;
+  ChunkDataFIFO();
+  ChunkDataFIFO(int nch, int head, int tail);
+  virtual ~ChunkDataFIFO() = default;
 
   void BookFIFO(int nch, int head, int tail);
 
@@ -49,11 +49,11 @@ private:
   int fHead; // Head window size
   int fTail; // Tail window size
 
-  ConcurrentDeque<std::unique_ptr<AMOREChunk>> fQueue;
+  ConcurrentDeque<std::unique_ptr<Chunk>> fQueue;
 
-  std::unique_ptr<AMOREChunk> fLastChunk;
-  std::unique_ptr<AMOREChunk> fCurrentChunk;
-  std::unique_ptr<AMOREChunk> fNextChunk;
+  std::unique_ptr<Chunk> fLastChunk;
+  std::unique_ptr<Chunk> fCurrentChunk;
+  std::unique_ptr<Chunk> fNextChunk;
   size_t fCurrentSampleIndex;
 
   // for dump statistics
@@ -63,8 +63,8 @@ private:
   unsigned long fLastTime;
 };
 
-inline void AMOREChunkFIFO::Stop() { fQueue.stop(); }
-inline void AMOREChunkFIFO::Restart() { fQueue.restart(); }
-inline bool AMOREChunkFIFO::IsStopped() const { return fQueue.is_stopped(); }
-inline bool AMOREChunkFIFO::Empty() const { return fQueue.empty() && !fCurrentChunk; }
-inline std::size_t AMOREChunkFIFO::GetQueueSize() const { return fQueue.size(); }
+inline void ChunkDataFIFO::Stop() { fQueue.stop(); }
+inline void ChunkDataFIFO::Restart() { fQueue.restart(); }
+inline bool ChunkDataFIFO::IsStopped() const { return fQueue.is_stopped(); }
+inline bool ChunkDataFIFO::Empty() const { return fQueue.empty() && !fCurrentChunk; }
+inline std::size_t ChunkDataFIFO::GetQueueSize() const { return fQueue.size(); }

@@ -17,7 +17,7 @@
 #include "TString.h"
 
 // Project Headers
-#include "AMOREAlgs/AMOREChunkFIFO.hh"
+#include "AMOREAlgs/ChunkDataFIFO.hh"
 #include "AMORESystem/AMOREADCConf.hh"
 
 /**
@@ -92,7 +92,7 @@ private:
 /**
  * SECTION 2: Producer Thread
  */
-void Producer(AMOREChunkFIFO & fifo, int nch, int numChunks, int ndp)
+void Producer(ChunkDataFIFO & fifo, int nch, int numChunks, int ndp)
 {
   AMOREADCConf conf;
   conf.SetZSU(0);
@@ -115,7 +115,7 @@ void Producer(AMOREChunkFIFO & fifo, int nch, int numChunks, int ndp)
 /**
  * SECTION 3: Consumer Thread with Real-time Continuity Monitor
  */
-void Consumer(AMOREChunkFIFO & fifo, int nch, int head, int tail)
+void Consumer(ChunkDataFIFO & fifo, int nch, int head, int tail)
 {
   const double baseline = 100.0;
   const double threshold = 400.0;
@@ -223,7 +223,7 @@ int main(int argc, char ** argv)
   const int tail = 6000;
   const int numChunks = 5000;
 
-  AMOREChunkFIFO fifo(nch, head, tail);
+  ChunkDataFIFO fifo(nch, head, tail);
   std::thread t1(Producer, std::ref(fifo), nch, numChunks, ndp);
   std::thread t2(Consumer, std::ref(fifo), nch, head, tail);
 

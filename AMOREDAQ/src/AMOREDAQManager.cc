@@ -191,6 +191,7 @@ void AMOREDAQManager::ReadConfigADC(YAML::Node ymlnode)
     if (node["RL"]) conf->SetRL(node["RL"].as<int>());
     if (node["DLY"]) conf->SetDLY(node["DLY"].as<int>());
     if (node["ZSU"]) conf->SetZSU(node["ZSU"].as<int>());
+    if (node["RTRG"]) conf->SetRTRG(node["RTRG"].as<int>());
 
     if (nch > 0) {
       FillConfigArray<int>(node["CID"], nch, [&](int i, int v) { conf->SetCID(i, v); }, true);
@@ -226,7 +227,7 @@ bool AMOREDAQManager::PrepareDAQ()
 
     int head = conf->DLY();
     int tail = rl - head;
-    fFIFOs.push_back(std::make_unique<AMOREChunkFIFO>(kNCHAMOREADC, head, tail));
+    fFIFOs.push_back(std::make_unique<ChunkDataFIFO>(kNCHAMOREADC, head, tail));
   }
 
   // sorting ADCs with SID

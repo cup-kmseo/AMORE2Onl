@@ -3,9 +3,9 @@
 #include <iomanip>
 #include <iostream>
 
-#include "AMOREAlgs/AMOREChunkFIFO.hh"
+#include "AMOREAlgs/ChunkDataFIFO.hh"
 
-AMOREChunkFIFO::AMOREChunkFIFO()
+ChunkDataFIFO::ChunkDataFIFO()
   : fNChannel(0),
     fHead(0),
     fTail(0),
@@ -14,14 +14,14 @@ AMOREChunkFIFO::AMOREChunkFIFO()
 {
 }
 
-AMOREChunkFIFO::AMOREChunkFIFO(int nch, int head, int tail)
+ChunkDataFIFO::ChunkDataFIFO(int nch, int head, int tail)
   : fCurrentChunk(nullptr),
     fCurrentSampleIndex(0)
 {
   BookFIFO(nch, head, tail);
 }
 
-void AMOREChunkFIFO::BookFIFO(int nch, int head, int tail)
+void ChunkDataFIFO::BookFIFO(int nch, int head, int tail)
 {
   fNChannel = nch;
   fHead = head;
@@ -39,10 +39,10 @@ void AMOREChunkFIFO::BookFIFO(int nch, int head, int tail)
 }
 
 // Producer: Push from unpacked data buffers
-int AMOREChunkFIFO::PushChunk(unsigned short ** adc, unsigned long * time, int ndp)
+int ChunkDataFIFO::PushChunk(unsigned short ** adc, unsigned long * time, int ndp)
 {
   if (ndp <= 0) return -1;
-  auto chunk = std::make_unique<AMOREChunk>(fNChannel, ndp);
+  auto chunk = std::make_unique<Chunk>(fNChannel, ndp);
   std::memcpy(chunk->fTime.data(), time, ndp * sizeof(unsigned long));
   for (int ch = 0; ch < fNChannel; ++ch) {
     std::memcpy(chunk->fADC[ch].data(), adc[ch], ndp * sizeof(unsigned short));
@@ -58,11 +58,11 @@ int AMOREChunkFIFO::PushChunk(unsigned short ** adc, unsigned long * time, int n
 }
 
 // Producer: Push from raw binary data
-int AMOREChunkFIFO::PushChunk(unsigned char * data, int ndp, AMOREADCConf * conf)
+int ChunkDataFIFO::PushChunk(unsigned char * data, int ndp, AMOREADCConf * conf)
 {
   if (ndp <= 0 || data == nullptr) return -1;
 
-  auto chunk = std::make_unique<AMOREChunk>(fNChannel, ndp);
+  auto chunk = std::make_unique<Chunk>(fNChannel, ndp);
   for (int j = 0; j < ndp; j++) {
     const int offset = j * 64;
     for (int i = 0; i < fNChannel; i++) {
@@ -93,7 +93,7 @@ int AMOREChunkFIFO::PushChunk(unsigned char * data, int ndp, AMOREADCConf * conf
   return 0;
 }
 
-int AMOREChunkFIFO::PopCurrent(unsigned short * adc, unsigned long & time)
+int ChunkDataFIFO::PopCurrent(unsigned short * adc, unsigned long & time)
 {
   // 1. Check if we need to rotate chunks because fCurrentChunk is exhausted
   if (fNextChunk && fCurrentChunk && fCurrentSampleIndex >= fCurrentChunk->fTime.size()) {
@@ -145,7 +145,7 @@ int AMOREChunkFIFO::PopCurrent(unsigned short * adc, unsigned long & time)
   return 0;
 }
 
-int AMOREChunkFIFO::DumpCurrent(unsigned short ** outADC, unsigned long * outTime)
+int ChunkDataFIFO::DumpCurrent(unsigned short ** outADC, unsigned long * outTime)
 {
   if (!fCurrentChunk) return -1;
 
@@ -214,7 +214,7 @@ int AMOREChunkFIFO::DumpCurrent(unsigned short ** outADC, unsigned long * outTim
   return copied;
 }
 
-void AMOREChunkFIFO::DumpStat()
+void ChunkDataFIFO::DumpStat()
 {
   double duration = (fLastTime - fFirstTime) / 1.e9;
   double rate = (duration > 0) ? (fTotalSamples / duration) / 1000.0 : 0;

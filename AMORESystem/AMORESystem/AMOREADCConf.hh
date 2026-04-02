@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "AMORE/amoreconsts.hh"
 #include "DAQConfig/AbsConf.hh"
 
@@ -18,6 +20,8 @@ public:
   void SetRL(int val);
   void SetDLY(int val);
   void SetZSU(int val);
+  void SetRTRG(int val);
+  void SetTRGMODE(const char * mode);
 
   int NCH() const;
   int CID(int ch) const override;
@@ -28,6 +32,8 @@ public:
   int RL() const;
   int DLY() const;
   int ZSU() const;
+  int RTRG() const;
+  const char * TRGMODE() const;
 
   void PrintConf() const override;
 
@@ -37,10 +43,13 @@ private:
   int fRL{};
   int fDLY{};
   int fZSU{};
+  int fRTRG{};
   int fCID[AMORE::kNCHPERADC]{};
   int fPID[AMORE::kNCHPERADC]{};
   int fTRGON[AMORE::kNCHPERADC]{};
   int fDT[AMORE::kNCHPERADC]{};
+  
+  std::string fTRGMODE{};
 
   ClassDef(AMOREADCConf, 1)
 };
@@ -54,6 +63,10 @@ inline void AMOREADCConf::SetRL(int val) { fRL = val; }
 inline void AMOREADCConf::SetDLY(int val) { fDLY = val; }
 
 inline void AMOREADCConf::SetZSU(int val) { fZSU = val; }
+
+inline void AMOREADCConf::SetRTRG(int val) { fRTRG = val; }
+
+inline void AMOREADCConf::SetTRGMODE(const char * mode) { fTRGMODE = mode; }
 
 inline void AMOREADCConf::SetCID(int ch, int val) { fCID[ch] = val; }
 
@@ -72,6 +85,10 @@ inline int AMOREADCConf::RL() const { return fRL; }
 inline int AMOREADCConf::DLY() const { return fDLY; }
 
 inline int AMOREADCConf::ZSU() const { return fZSU; }
+
+inline int AMOREADCConf::RTRG() const { return fRTRG; }
+
+inline const char * AMOREADCConf::TRGMODE() const { return fTRGMODE.c_str(); }
 
 inline int AMOREADCConf::CID(int ch) const { return fCID[ch]; }
 

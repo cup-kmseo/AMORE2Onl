@@ -4,7 +4,7 @@
 #include <vector>
 #include <yaml-cpp/yaml.h>
 
-#include "AMOREAlgs/AMOREChunkFIFO.hh"
+#include "AMOREAlgs/ChunkDataFIFO.hh"
 #include "AMORESystem/AMORETCB.hh"
 #include "DAQ/CupDAQManager.hh"
 #include "DAQConfig/AbsConf.hh"
@@ -44,7 +44,7 @@ private:
 private:
   AMORETCB & fTCB;
 
-  std::vector<std::unique_ptr<AMOREChunkFIFO>> fFIFOs;
+  std::vector<std::unique_ptr<ChunkDataFIFO>> fFIFOs;
   ConcurrentDeque<Crystal_t> fTriggeredCrystals;
 
   PROCSTATE fStreamStatus;

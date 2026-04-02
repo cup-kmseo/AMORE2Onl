@@ -1,5 +1,6 @@
 set ( TEST_SOURCES
     fifo_test.cc
+    test_TriggerManager.cc
 )
 
 foreach ( src ${TEST_SOURCES} )
