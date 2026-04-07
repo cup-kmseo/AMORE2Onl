@@ -18,6 +18,19 @@ public:
   AMOREDAQManager();
   ~AMOREDAQManager() override;
 
+  void SetRunNumber(int run);
+  void SetDAQID(int id);
+  void SetConfigFilename(const char * name);
+  void SetOutputFilename(const char * fname);
+
+  void SetDAQTime(int t);
+  void SetNEvent(int n);
+  void SetCompressionLevel(int level);
+  void SetOutputSplitTime(int time);
+
+  void SetVerboseLevel(int level);
+  void EnableHistograming();
+
   bool AddADC(AbsConfList * conflist) override;
   bool PrepareDAQ() override;
 
@@ -36,6 +49,7 @@ private:
   void ReadConfigTCB(YAML::Node ymlnode);
   void ReadConfigADC(YAML::Node ymlnode);
 
+  bool HasRunningTrigger() const;
   void TF_ReadData_AMORE();
   void TF_StreamData();
   void TF_SWTrigger(int n);
@@ -48,8 +62,29 @@ private:
   ConcurrentDeque<Crystal_t> fTriggeredCrystals;
 
   PROCSTATE fStreamStatus;
+  PROCSTATE fTrigStatus[AMORE::kNADCAMOREADC];
 
   unsigned long fTimeDelta;
 
   ClassDef(AMOREDAQManager, 0)
 };
+
+inline void AMOREDAQManager::SetRunNumber(int run) { fRunNumber = run; }
+
+inline void AMOREDAQManager::SetDAQID(int id) { fDAQID = id; }
+
+inline void AMOREDAQManager::SetConfigFilename(const char * name) { fConfigFilename = name; }
+
+inline void AMOREDAQManager::SetOutputFilename(const char * fname) { fOutputFilename = fname; }
+
+inline void AMOREDAQManager::SetDAQTime(int t) { fSetDAQTime = t; }
+
+inline void AMOREDAQManager::SetNEvent(int n) { fSetNEvent = n; }
+
+inline void AMOREDAQManager::SetCompressionLevel(int level) { fCompressionLevel = level; }
+
+inline void AMOREDAQManager::SetOutputSplitTime(int time) { fOutputSplitTime = time; }
+
+inline void AMOREDAQManager::SetVerboseLevel(int level) { fVerboseLevel = level; }
+
+inline void AMOREDAQManager::EnableHistograming() { fDoHistograming = true; }

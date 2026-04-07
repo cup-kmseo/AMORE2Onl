@@ -16,6 +16,7 @@ namespace AMORE {
 
     inline constexpr int kRECORDLENGTH   = 30000; // record length for writing waveform
     inline constexpr int kRTRECORDLENGTH = 100000;
+    inline constexpr int kNADCAMOREADC   = 12;     // number of AMOREADC modules
 
     // Example of using std::string_view for crystal names (C++17)
     /*

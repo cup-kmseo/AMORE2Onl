@@ -1,6 +1,7 @@
 #include "TRandom3.h"
 
 #include "AMOREDAQ/AMOREDAQManager.hh"
+#include "AMOREHDF5/H5AMOREEvent.hh"
 
 void AMOREDAQManager::TF_ReadData_AMORE()
 {
@@ -146,54 +147,59 @@ void AMOREDAQManager::TF_StreamData()
 
 void AMOREDAQManager::TF_SWTrigger(int n)
 {
+  fTrigStatus[n] = READY;
+
   if (!ThreadWait(fRunStatus, fDoExit)) {
     WARNING("Exited by exit command before starting");
     return;
   }
 
-  auto * adc = static_cast<AbsADC *>(fCont[n]);
-  auto * conf = static_cast<AMOREADCConf *>(adc->GetConfig());
+  auto *adc  = static_cast<AbsADC *>(fCont[n]);
+  auto *conf = static_cast<AMOREADCConf *>(adc->GetConfig());
 
-  const int ndp = conf->RL();
+  const int ndp  = conf->RL();
   const int tail = ndp - conf->DLY();
 
   INFO("software trigger for AMOREADC[sid=%d] started.", conf->SID());
+  fTrigStatus[n] = RUNNING;
 
-  auto & fifo = fFIFOs[n];
+  auto &fifo = fFIFOs[n];
 
   const int nch = kNCHAMOREADC;
   std::vector<unsigned short> adcval(nch);
-  unsigned long currenttime;
-  unsigned long lasttime;
+  unsigned long currenttime = 0;
+  unsigned long lasttime = 0;
 
   bool isFirstSample = true;
 
   std::vector<unsigned long> dumpTime(ndp);
-  std::vector<unsigned short *> dumpADC(nch);
+
+  std::vector<std::vector<unsigned short>> dumpStorage(
+      nch, std::vector<unsigned short>(ndp));
+  std::vector<unsigned short*> dumpADC(nch);
   for (int i = 0; i < nch; ++i)
-    dumpADC[i] = new unsigned short[ndp];
+    dumpADC[i] = dumpStorage[i].data();
 
   std::vector<std::uint16_t> phonon(ndp);
   std::vector<std::uint16_t> photon(ndp);
 
-
-  std::vector<int> ndt(nch);
-  std::vector<bool> istriggered(nch);
+  std::vector<int> ndt(nch, 0);
+  std::vector<bool> istriggered(nch, false);
+  std::vector<bool> pendingTrigger(nch, false);
+  std::vector<int> pendingCount(nch, 0);
 
   while (true) {
-    if (fDoExit || RUNSTATE::CheckError(fRunStatus)) { break; }
-
-    if (fStreamStatus == ENDED && fifo->Empty()) { break; }
+    if (fDoExit || RUNSTATE::CheckError(fRunStatus)) break;
+    if (fStreamStatus == ENDED && fifo->Empty()) break;
 
     int stat = fifo->PopCurrent(adcval.data(), currenttime);
     if (stat == 0) {
-      // realtime integrity check
       if (!isFirstSample) {
         unsigned long delta = currenttime - lasttime;
         if (delta != fTimeDelta) {
           if (delta < fTimeDelta) {
-            WARNING("[NS ERROR] Overlap/Jitter! Last: %lu Now: %lu Gap: %lu ns", lasttime,
-                    currenttime, delta);
+            WARNING("[NS ERROR] Overlap/Jitter! Last: %lu Now: %lu Gap: %lu ns",
+                    lasttime, currenttime, delta);
           }
           else {
             unsigned long lost = (delta / fTimeDelta) - 1;
@@ -204,7 +210,6 @@ void AMOREDAQManager::TF_SWTrigger(int n)
           }
         }
 
-        // success poping a sample from fifo, triggering
         for (int i = 0; i < nch; ++i) {
           if (!conf->TRGON(i)) continue;
 
@@ -217,47 +222,181 @@ void AMOREDAQManager::TF_SWTrigger(int n)
             continue;
           }
 
-          if (gRandom->Rndm() < 1e-06) {
-            INFO("%02d [sid=%d] is triggered", i, adc->GetSID());
-            fifo->DumpCurrent(dumpADC.data(), dumpTime.data());
+          if (pendingTrigger[i]) {
+            pendingCount[i] += 1;
 
-            int pid = conf->PID(i);
+            if (pendingCount[i] >= tail) {
+              if (i + 1 >= nch) {
+                WARNING("Channel %02d [sid=%d] has no paired channel for dump",
+                        i, adc->GetSID());
+                pendingTrigger[i] = false;
+                pendingCount[i] = 0;
+                continue;
+              }
 
-            Crystal_t xtal;
-            xtal.id = pid/2;
-            xtal.ttime = currenttime;
-            
-            for (int j = 0 ; j < ndp; ++j) {
-              phonon[i] = static_cast<std::uint16_t>(dumpADC[i][j]);
-              photon[i] = static_cast<std::uint16_t>(dumpADC[i+1][j]);
+              int copied = fifo->DumpCurrent(dumpADC.data(), dumpTime.data());
+
+              if (copied != ndp) {
+                WARNING("Channel %02d [sid=%d] incomplete dump: %d/%d",
+                        i, adc->GetSID(), copied, ndp);
+              }
+              else {
+                int pid = conf->PID(i);
+
+                Crystal_t xtal;
+                xtal.ndp   = static_cast<unsigned int>(ndp);
+                xtal.id    = pid / 2;
+                xtal.ttime = currenttime;
+
+                for (int j = 0; j < ndp; ++j) {
+                  phonon[j] = static_cast<std::uint16_t>(dumpADC[i][j]);
+                  photon[j] = static_cast<std::uint16_t>(dumpADC[i + 1][j]);
+                }
+
+                xtal.SetWaveforms(phonon.data(), photon.data(), ndp);
+                fTriggeredCrystals.push_back(xtal);
+
+                INFO("Channel %02d [sid=%d] event confirmed after %d samples",
+                     i, adc->GetSID(), pendingCount[i]);
+
+                istriggered[i] = true;
+                ndt[i] = 0;
+              }
+
+              pendingTrigger[i] = false;
+              pendingCount[i] = 0;
             }
-            xtal.SetWaveforms(phonon.data(), photon.data(), ndp);
 
-            fTriggeredCrystals.push_back(xtal);
+            continue;
+          }
 
-            istriggered[i] = true;
+          if (gRandom->Rndm() < 1e-06) {
+            INFO("Channel %02d [sid=%d] is triggered", i, adc->GetSID());
+            pendingTrigger[i] = true;
+            pendingCount[i] = 0;
           }
         }
       }
       else {
         isFirstSample = false;
       }
+
       lasttime = currenttime;
     }
     else {
-      // or waiting for new chunk
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
 
   INFO("software trigger for AMOREADC[sid=%d] ended.", conf->SID());
+  fTrigStatus[n] = ENDED;
+
   fifo->DumpStat();
 }
 
-void AMOREDAQManager::TF_WriteEvent_AMORE() 
+bool AMOREDAQManager::HasRunningTrigger() const
 {
+  for (const auto & st : fTrigStatus) {
+    if (st == READY || st == RUNNING) return true;
+  }
+  return false;
+}
 
+void AMOREDAQManager::TF_WriteEvent_AMORE()
+{
+  if (!ThreadWait(fRunStatus, fDoExit)) {
+    WARNING("Exited by exit command before starting");
+    return;
+  }
 
+  auto * adc0 = static_cast<AbsADC *>(fCont[0]);
+  auto * conf0 = static_cast<AMOREADCConf *>(adc0->GetConfig());
+  const int ndp = conf0->RL();
 
+  if (ndp <= 0 || ndp > kH5AMORENDPMAX) {
+    ERROR("invalid ndp: %d (max %d)", ndp, kH5AMORENDPMAX);
+    RUNSTATE::SetError(fRunStatus);
+    fWriteStatus = ERROR;
+    return;
+  }
 
+  auto * h5event = new H5AMOREEvent;
+  h5event->SetNDP(ndp);
+  fH5Event = h5event;
+
+  if (OpenNewHDF5File(fOutputFilename.c_str()) < 0) {
+    ERROR("can't open hdf5 output file %s", fOutputFilename.c_str());
+    RUNSTATE::SetError(fRunStatus);
+    fWriteStatus = ERROR;
+    return;
+  }
+
+  EventInfo_t eventinfo{};
+  std::vector<Crystal_t> eventdata;
+  eventdata.reserve(1);
+
+  double perror = 0.0;
+  double integral = 0.0;
+
+  fWriteStatus = RUNNING;
+
+  while (true) {
+    if (fDoExit || RUNSTATE::CheckError(fRunStatus)) break;
+
+    if (fTriggeredCrystals.empty()) {
+      if (!HasRunningTrigger()) break;
+      ThreadSleep(fWriteSleep, perror, integral, fTriggeredCrystals.size());
+      continue;
+    }
+
+    eventdata.clear();
+
+    auto popped = fTriggeredCrystals.pop_front();
+    if (!popped) {
+      ThreadSleep(fWriteSleep, perror, integral, fTriggeredCrystals.size());
+      continue;
+    }
+
+    Crystal_t crystal = std::move(popped.value());
+
+    if (crystal.ndp == 0) {
+      crystal.ndp = static_cast<std::uint16_t>(ndp);
+    }
+
+    if (crystal.ndp != static_cast<std::uint16_t>(ndp)) {
+      ERROR("crystal ndp mismatch: %u != %d", crystal.ndp, ndp);
+      RUNSTATE::SetError(fRunStatus);
+      fWriteStatus = ERROR;
+      break;
+    }
+
+    eventdata.push_back(std::move(crystal));
+
+    eventinfo.tnum  = 0;
+    eventinfo.ttime = eventdata[0].ttime;
+    eventinfo.ttype = 0;
+    eventinfo.nhit  = static_cast<decltype(eventinfo.nhit)>(eventdata.size());
+
+    herr_t status = h5event->AppendEvent(eventinfo, eventdata);
+    if (status < 0) {
+      ERROR("H5AMOREEvent::AppendEvent failed");
+      RUNSTATE::SetError(fRunStatus);
+      fWriteStatus = ERROR;
+      break;
+    }
+
+    ++fNBuiltEvent;
+
+    ThreadSleep(fWriteSleep, perror, integral, fTriggeredCrystals.size());
+  }
+
+  if (fHDF5File) {
+    fHDF5File->Close();
+  }
+
+  if (fWriteStatus != ERROR) {
+    fWriteStatus = ENDED;
+  }
+
+  INFO("Writing events ended");
 }

@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "OnlConsts/adcconsts.hh"
+#include "AMOREDAQ/daqopt.hh"
 
 struct daqopt {
   std::vector<ADC::TYPE> adctype;
