@@ -10,7 +10,15 @@ H5AMOREEvent::H5AMOREEvent()
 {
 }
 
-H5AMOREEvent::~H5AMOREEvent() {}
+H5AMOREEvent::~H5AMOREEvent()
+{
+  Info("~H5AMOREEvent", "enter: fWriteTag=%d fEvtBuf=%zu fChBuf=%zu",
+       (int)fWriteTag, fEvtBuf.size(), fChBuf.size());
+
+  if (fWriteTag) { FlushBuffer(); }
+
+  Info("~H5AMOREEvent", "after FlushBuffer");
+}
 
 void H5AMOREEvent::Open()
 {

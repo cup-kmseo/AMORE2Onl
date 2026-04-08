@@ -321,10 +321,14 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
   }
 
   auto * h5event = new H5AMOREEvent;
+  h5event->SetWritable();
   h5event->SetNDP(ndp);
   fH5Event = h5event;
 
   if (OpenNewHDF5File(fOutputFilename.c_str()) < 0) {
+    delete h5event;
+    fH5Event = nullptr;
+
     ERROR("can't open hdf5 output file %s", fOutputFilename.c_str());
     RUNSTATE::SetError(fRunStatus);
     fWriteStatus = ERROR;
@@ -392,6 +396,12 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
 
   if (fHDF5File) {
     fHDF5File->Close();
+  }
+
+  if (h5event) {
+    delete h5event;
+    h5event = nullptr;
+    fH5Event = nullptr;
   }
 
   if (fWriteStatus != ERROR) {

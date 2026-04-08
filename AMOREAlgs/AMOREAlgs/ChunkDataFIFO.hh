@@ -9,12 +9,12 @@
 
 struct Chunk {
   std::vector<unsigned long> fTime;
-  std::vector<std::vector<unsigned int>> fADC;
+  std::vector<std::vector<unsigned short>> fADC;
 
   Chunk(int nch, int ndp)
   {
     fTime.resize(ndp);
-    fADC.assign(nch, std::vector<unsigned int>(ndp));
+    fADC.assign(nch, std::vector<unsigned short>(ndp));
   }
 };
 
@@ -66,5 +66,12 @@ private:
 inline void ChunkDataFIFO::Stop() { fQueue.stop(); }
 inline void ChunkDataFIFO::Restart() { fQueue.restart(); }
 inline bool ChunkDataFIFO::IsStopped() const { return fQueue.is_stopped(); }
-inline bool ChunkDataFIFO::Empty() const { return fQueue.empty() && !fCurrentChunk; }
+inline bool ChunkDataFIFO::Empty() const
+{
+  const bool current_empty =
+      (!fCurrentChunk) ||
+      (fCurrentSampleIndex >= fCurrentChunk->fTime.size());
+
+  return fQueue.empty() && !fNextChunk && current_empty;
+}
 inline std::size_t ChunkDataFIFO::GetQueueSize() const { return fQueue.size(); }
