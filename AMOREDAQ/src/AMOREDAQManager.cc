@@ -4,6 +4,7 @@
 #include <string>
 #include <thread>
 
+#include "AMOREAlgs/RandomTrigger.hh"
 #include "AMOREDAQ/AMOREDAQManager.hh"
 #include "AMORESystem/AMOREADC.hh"
 #include "AMORESystem/AMOREADCConf.hh"
@@ -210,13 +211,13 @@ bool AMOREDAQManager::PrepareDAQ()
 
   if (nadc <= 0) {
     ERROR("No ADC module included in the configuration");
-    fReadStatus = ERROR;
+    fReadStatus = PROCSTATE::ERROR;
     RUNSTATE::SetError(fRunStatus);
     return false;
   }
 
-  // preparing chunk data buffer for swtrigger
-  fFIFOs.clear();
+  // preparing software triggers (one per ADC)
+  fTriggers.clear();
   int dsr = 0;
   int rl = 0;
   for (int i = 0; i < nadc; ++i) {
@@ -225,9 +226,13 @@ bool AMOREDAQManager::PrepareDAQ()
     dsr = conf->SR();
     rl = conf->RL();
 
-    int head = conf->DLY();
-    int tail = rl - head;
-    fFIFOs.push_back(std::make_unique<ChunkDataFIFO>(kNCHAMOREADC, head, tail));
+    auto trig = std::make_unique<RandomTrigger>();
+    trig->SetConfig(conf);
+    if (!trig->Prepare()) {
+      ERROR("Failed to prepare RandomTrigger for AMOREADC[sid=%d]", conf->SID());
+      return false;
+    }
+    fTriggers.push_back(std::move(trig));
   }
 
   // sorting ADCs with SID

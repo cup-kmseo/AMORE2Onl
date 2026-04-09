@@ -22,6 +22,9 @@ public:
 
   virtual void PushChunkData(unsigned char * data, int ndp);
 
+  void Stop();
+  bool IsFIFOEmpty() const;
+
   virtual bool Prepare() = 0;
   virtual int DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned short ** adcval,
                         unsigned long * timetag = NULL) = 0;
@@ -51,3 +54,7 @@ inline void AbsSWTrigger::SetDebug(int level) { fDebug = level; }
 inline void AbsSWTrigger::SetConfig(AMOREADCConf * config) { fConfig = config; }
 
 inline const char * AbsSWTrigger::GetName() const { return fName.c_str(); }
+
+inline void AbsSWTrigger::Stop() { if (fFIFO) fFIFO->Stop(); }
+
+inline bool AbsSWTrigger::IsFIFOEmpty() const { return !fFIFO || fFIFO->Empty(); }

@@ -1,4 +1,7 @@
 #include <filesystem>
+#include <thread>
+
+#include "DAQUtils/ELog.hh"
 
 #include "AMOREDAQ/AMOREDAQManager.hh"
 
