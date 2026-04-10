@@ -16,11 +16,13 @@ struct Crystal_t {
   std::uint16_t phonon[kH5AMORENDPMAX];
   std::uint16_t photon[kH5AMORENDPMAX];
   std::uint64_t ttime;
+  std::uint32_t trgbit; // bitmask: bit N set if trigger path N fired
 
   Crystal_t() noexcept
     : id(0),
       ndp(0),
-      ttime(0)
+      ttime(0),
+      trgbit(0)
   {
     std::memset(phonon, 0, sizeof(phonon));
     std::memset(photon, 0, sizeof(photon));
@@ -59,7 +61,8 @@ inline hid_t Crystal_t::BuildType()
   hid_t arrtype = H5Tarray_create2(H5T_STD_U16LE, 1, dim);
   H5Tinsert(type, "phonon", HOFFSET(Crystal_t, phonon), arrtype);
   H5Tinsert(type, "photon", HOFFSET(Crystal_t, photon), arrtype);
-  H5Tinsert(type, "ttime", HOFFSET(Crystal_t, ttime), H5T_STD_U64LE);
+  H5Tinsert(type, "ttime",   HOFFSET(Crystal_t, ttime),  H5T_STD_U64LE);
+  H5Tinsert(type, "trgbit", HOFFSET(Crystal_t, trgbit), H5T_STD_U32LE);
 
   return type;
 }

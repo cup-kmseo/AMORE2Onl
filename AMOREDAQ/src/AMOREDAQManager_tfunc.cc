@@ -131,7 +131,8 @@ void AMOREDAQManager::TF_StreamData()
       unsigned char * data = chunkdata->data;
       int ndp = kKILOBYTES * chunkdata->size / 64;
 
-      fTriggers[i]->PushChunkData(data, ndp);
+      for (auto & trig : fTriggerManager.GetTriggers(i))
+        trig->PushChunkData(data, ndp);
 
       nTotalChunkinADC -= 1;
     }
@@ -141,7 +142,8 @@ void AMOREDAQManager::TF_StreamData()
   }
 
   for (int i = 0; i < nadc; ++i) {
-    fTriggers[i]->Stop();
+    for (auto & trig : fTriggerManager.GetTriggers(i))
+      trig->Stop();
   }
 
   fStreamStatus = ENDED;
@@ -165,7 +167,13 @@ void AMOREDAQManager::TF_SWTrigger(int n)
   INFO("software trigger for AMOREADC[sid=%d] started.", conf->SID());
   fTrigStatus[n] = RUNNING;
 
-  auto & trigger = fTriggers[n];
+  const auto & triggers = fTriggerManager.GetTriggers(n);
+  if (triggers.empty()) {
+    ERROR("No trigger assigned for ADC index %d", n);
+    fTrigStatus[n] = PROCSTATE::ERROR;
+    return;
+  }
+  const int ntrg = static_cast<int>(triggers.size());
 
   // Dump buffers: one row per channel, ndp samples per row
   std::vector<std::vector<unsigned short>> dumpStorage(nch, std::vector<unsigned short>(ndp));
@@ -173,7 +181,7 @@ void AMOREDAQManager::TF_SWTrigger(int n)
   for (int i = 0; i < nch; ++i) dumpADC[i] = dumpStorage[i].data();
 
   std::vector<unsigned long> dumpTime(ndp);
-  bool trgbit[kNCHAMOREADC]{};
+  bool chbit[kNCHAMOREADC]{};
   unsigned long trgtime = 0;
 
   std::vector<std::uint16_t> phonon(ndp);
@@ -182,41 +190,53 @@ void AMOREDAQManager::TF_SWTrigger(int n)
   while (true) {
     if (fDoExit || RUNSTATE::CheckError(fRunStatus)) break;
 
-    int ret = trigger->DoTrigger(trgtime, trgbit, dumpADC.data(), dumpTime.data());
+    bool anyData = false;
+    bool allEmpty = true;
 
-    if (ret == 1) {
-      // Package Crystal_t for each triggered phonon channel (even index)
-      for (int i = 0; i < nch; i += 2) {
-        if (!trgbit[i]) continue;
-        if (i + 1 >= nch) {
-          WARNING("Channel %02d [sid=%d] has no paired photon channel", i, adc->GetSID());
-          continue;
+    for (int t = 0; t < ntrg; ++t) {
+      int ret = triggers[t]->DoTrigger(trgtime, chbit, dumpADC.data(), dumpTime.data());
+
+      if (ret == 1) {
+        anyData = true;
+        allEmpty = false;
+        const std::uint32_t pathbit = (1u << t);
+
+        for (int i = 0; i < nch; i += 2) {
+          if (!chbit[i]) continue;
+          if (i + 1 >= nch) {
+            WARNING("Channel %02d [sid=%d] has no paired photon channel", i, adc->GetSID());
+            continue;
+          }
+
+          Crystal_t xtal;
+          xtal.ndp    = static_cast<std::uint16_t>(ndp);
+          xtal.id     = static_cast<std::uint16_t>(conf->PID(i) / 2);
+          xtal.ttime  = trgtime;
+          xtal.trgbit = pathbit;
+
+          for (int j = 0; j < ndp; ++j) {
+            phonon[j] = dumpADC[i][j];
+            photon[j] = dumpADC[i + 1][j];
+          }
+
+          xtal.SetWaveforms(phonon.data(), photon.data(), ndp);
+          fTriggeredCrystals.push_back(xtal);
+
+          INFO("Crystal id=%d [sid=%d] triggered at t=%lu (path %d)",
+               xtal.id, adc->GetSID(), trgtime, t);
         }
-
-        Crystal_t xtal;
-        xtal.ndp   = static_cast<std::uint16_t>(ndp);
-        xtal.id    = static_cast<std::uint16_t>(conf->PID(i) / 2);
-        xtal.ttime = trgtime;
-
-        for (int j = 0; j < ndp; ++j) {
-          phonon[j] = dumpADC[i][j];
-          photon[j] = dumpADC[i + 1][j];
-        }
-
-        xtal.SetWaveforms(phonon.data(), photon.data(), ndp);
-        fTriggeredCrystals.push_back(xtal);
-
-        INFO("Crystal id=%d [sid=%d] triggered at t=%lu", xtal.id, adc->GetSID(), trgtime);
+      }
+      else if (ret == 0) {
+        if (!(fStreamStatus == ENDED && triggers[t]->IsFIFOEmpty())) allEmpty = false;
+      }
+      else {
+        // ret < 0: FIFO error or stopped — treat this path as done
       }
     }
-    else if (ret == 0) {
-      // FIFO empty — check if streaming is done
-      if (fStreamStatus == ENDED && trigger->IsFIFOEmpty()) break;
+
+    if (!anyData) {
+      if (allEmpty) break;
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    else {
-      // ret < 0: FIFO error or stopped
-      break;
     }
   }
 
@@ -224,27 +244,3 @@ void AMOREDAQManager::TF_SWTrigger(int n)
   fTrigStatus[n] = ENDED;
 }
 
-bool AMOREDAQManager::HasRunningTrigger() const
-{
-  for (const auto & st : fTrigStatus) {
-    if (st == READY || st == RUNNING) return true;
-  }
-  return false;
-}
-
-void AMOREDAQManager::TF_WriteEvent_AMORE()
-{
-  if (!ThreadWait(fRunStatus, fDoExit)) {
-    WARNING("Exited by exit command before starting");
-    return;
-  }
-
-  if (OpenNewHDF5File(fOutputFilename.c_str()) < 0) {
-    ERROR("can't create hdf5 output file %s", fOutputFilename.c_str());
-    RUNSTATE::SetError(fRunStatus);
-    fWriteStatus = PROCSTATE::ERROR;
-    return;
-  }
-
-  WriteAMORE_HDF5();
-}

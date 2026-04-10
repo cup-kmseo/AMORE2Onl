@@ -28,7 +28,7 @@ bool RandomTrigger::Prepare()
   }
 
   fDSR = fConfig->SR();
-  fRate = fConfig->RTRG();
+  fRate = fConfig->PTRG();
 
   // Calculate the probability for a single bin to fire.
   fProbPerBin = (fRate * static_cast<double>(fDSR)) / 1000000.0;

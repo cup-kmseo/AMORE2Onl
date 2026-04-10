@@ -25,8 +25,8 @@ public:
   // Note: Pass the ADC::TYPE (e.g., ADC::kAMOREADC) to filter correct configs
   bool BuildTriggers(const AbsConfList * confList);
 
-  // Get the trigger assigned to a specific ADC index
-  AbsSWTrigger * GetTrigger(int adcIndex) const;
+  // Get all triggers assigned to a specific ADC index
+  const std::vector<std::unique_ptr<AbsSWTrigger>> & GetTriggers(int adcIndex) const;
 
   // Prepare all initialized triggers in the pool
   bool PrepareAll();
@@ -35,6 +35,9 @@ private:
   // Map of available trigger types (Name -> Creation Function)
   std::map<std::string, TriggerCreator> fRegistry;
 
-  // The active pool containing heterogeneous triggers (Index matches ADC ID)
-  std::vector<std::unique_ptr<AbsSWTrigger>> fActivePool;
+  // The active pool: one inner vector per ADC, each containing its trigger path(s)
+  std::vector<std::vector<std::unique_ptr<AbsSWTrigger>>> fActivePool;
+
+  // Empty vector returned when adcIndex is out of range
+  std::vector<std::unique_ptr<AbsSWTrigger>> fEmpty;
 };

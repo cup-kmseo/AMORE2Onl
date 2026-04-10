@@ -4,7 +4,7 @@
 #include <vector>
 #include <yaml-cpp/yaml.h>
 
-#include "AMOREAlgs/AbsSWTrigger.hh"
+#include "AMOREAlgs/TriggerManager.hh"
 #include "AMORESystem/AMORETCB.hh"
 #include "DAQ/CupDAQManager.hh"
 #include "DAQConfig/AbsConf.hh"
@@ -55,13 +55,12 @@ private:
   void TF_SWTrigger(int n);
   void TF_WriteEvent_AMORE();
 
-  void WriteAMORE_HDF5();
   long OpenNewHDF5File(const char * fname) override;
 
 private:
   AMORETCB & fTCB;
 
-  std::vector<std::unique_ptr<AbsSWTrigger>> fTriggers;
+  TriggerManager fTriggerManager;
   ConcurrentDeque<Crystal_t> fTriggeredCrystals;
 
   PROCSTATE fStreamStatus;

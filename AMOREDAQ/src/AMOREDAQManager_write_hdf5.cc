@@ -9,8 +9,28 @@
 #include "AMORESystem/AMORETCBConf.hh"
 #include "AMOREDAQ/AMOREDAQManager.hh"
 
-void AMOREDAQManager::WriteAMORE_HDF5()
+bool AMOREDAQManager::HasRunningTrigger() const
 {
+  for (const auto & st : fTrigStatus) {
+    if (st == READY || st == RUNNING) return true;
+  }
+  return false;
+}
+
+void AMOREDAQManager::TF_WriteEvent_AMORE()
+{
+  if (!ThreadWait(fRunStatus, fDoExit)) {
+    WARNING("Exited by exit command before starting");
+    return;
+  }
+
+  if (OpenNewHDF5File(fOutputFilename.c_str()) < 0) {
+    ERROR("can't create hdf5 output file %s", fOutputFilename.c_str());
+    RUNSTATE::SetError(fRunStatus);
+    fWriteStatus = PROCSTATE::ERROR;
+    return;
+  }
+
   auto * adc0 = static_cast<AbsADC *>(fCont[0]);
   auto * conf0 = static_cast<AMOREADCConf *>(adc0->GetConfig());
   const int ndp = conf0->RL();
@@ -100,8 +120,16 @@ void AMOREDAQManager::WriteAMORE_HDF5()
       eventdata.push_back(std::move(crystal));
     }
     else if (crystal.ttime - eventStartTime <= cw) {
-      // Within coincidence window — add to current event
-      eventdata.push_back(std::move(crystal));
+      // Within coincidence window — check for duplicate (same id & ttime)
+      bool merged = false;
+      for (auto & existing : eventdata) {
+        if (existing.id == crystal.id && existing.ttime == crystal.ttime) {
+          existing.trgbit |= crystal.trgbit;
+          merged = true;
+          break;
+        }
+      }
+      if (!merged) eventdata.push_back(std::move(crystal));
     }
     else {
       // Outside CW — flush current event and start a new one

@@ -68,19 +68,18 @@ int main()
   std::cout << "[Test 3] Verifying assigned triggers in the pool..." << std::endl;
 
   // Note: This relies on GetNADC() correctly identifying the 3 added configs.
-  AbsSWTrigger * trg0 = trgManager.GetTrigger(0);
-  if (trg0) std::cout << "-> ADC 0: Successfully got " << trg0->GetName() << std::endl;
-  else
-    std::cerr << "-> ADC 0: Trigger is null (Check if GetConfig() works with Add())" << std::endl;
+  const auto & trgs0 = trgManager.GetTriggers(0);
+  if (!trgs0.empty()) std::cout << "-> ADC 0: Successfully got " << trgs0[0]->GetName() << std::endl;
+  else std::cerr << "-> ADC 0: Trigger is null (Check if GetConfig() works with Add())" << std::endl;
 
-  AbsSWTrigger * trg1 = trgManager.GetTrigger(1);
-  if (trg1) std::cout << "-> ADC 1: Successfully got " << trg1->GetName() << std::endl;
+  const auto & trgs1 = trgManager.GetTriggers(1);
+  if (!trgs1.empty()) std::cout << "-> ADC 1: Successfully got " << trgs1[0]->GetName() << std::endl;
   else std::cerr << "-> ADC 1: Trigger is null" << std::endl;
 
-  AbsSWTrigger * trg2 = trgManager.GetTrigger(2);
-  if (!trg2)
-    std::cout << "-> ADC 2: Null as expected (Unknown trigger type handled properly)." << std::endl;
-  else std::cerr << "-> ADC 2: FAIL - Should be null, but got " << trg2->GetName() << std::endl;
+  const auto & trgs2 = trgManager.GetTriggers(2);
+  if (trgs2.empty())
+    std::cout << "-> ADC 2: Empty as expected (Unknown trigger type handled properly)." << std::endl;
+  else std::cerr << "-> ADC 2: FAIL - Should be empty, but got " << trgs2[0]->GetName() << std::endl;
 
   std::cout << std::endl;
 

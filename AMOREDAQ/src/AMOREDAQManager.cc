@@ -4,7 +4,6 @@
 #include <string>
 #include <thread>
 
-#include "AMOREAlgs/RandomTrigger.hh"
 #include "AMOREDAQ/AMOREDAQManager.hh"
 #include "AMORESystem/AMOREADC.hh"
 #include "AMORESystem/AMOREADCConf.hh"
@@ -192,7 +191,15 @@ void AMOREDAQManager::ReadConfigADC(YAML::Node ymlnode)
     if (node["RL"]) conf->SetRL(node["RL"].as<int>());
     if (node["DLY"]) conf->SetDLY(node["DLY"].as<int>());
     if (node["ZSU"]) conf->SetZSU(node["ZSU"].as<int>());
-    if (node["RTRG"]) conf->SetRTRG(node["RTRG"].as<int>());
+    if (node["PTRG"]) conf->SetPTRG(node["PTRG"].as<int>());
+    if (node["TRGMODE"]) {
+      if (node["TRGMODE"].IsSequence()) {
+        for (const auto & m : node["TRGMODE"])
+          conf->AddTRGMODE(m.as<std::string>().c_str());
+      } else {
+        conf->SetTRGMODE(node["TRGMODE"].as<std::string>().c_str());
+      }
+    }
 
     if (nch > 0) {
       FillConfigArray<int>(node["CID"], nch, [&](int i, int v) { conf->SetCID(i, v); }, true);
@@ -216,8 +223,16 @@ bool AMOREDAQManager::PrepareDAQ()
     return false;
   }
 
-  // preparing software triggers (one per ADC)
-  fTriggers.clear();
+  // preparing software triggers via TriggerManager
+  if (!fTriggerManager.BuildTriggers(fConfigList)) {
+    ERROR("TriggerManager::BuildTriggers failed");
+    return false;
+  }
+  if (!fTriggerManager.PrepareAll()) {
+    ERROR("TriggerManager::PrepareAll failed");
+    return false;
+  }
+
   int dsr = 0;
   int rl = 0;
   for (int i = 0; i < nadc; ++i) {
@@ -225,14 +240,6 @@ bool AMOREDAQManager::PrepareDAQ()
     auto * conf = static_cast<AMOREADCConf *>(adc->GetConfig());
     dsr = conf->SR();
     rl = conf->RL();
-
-    auto trig = std::make_unique<RandomTrigger>();
-    trig->SetConfig(conf);
-    if (!trig->Prepare()) {
-      ERROR("Failed to prepare RandomTrigger for AMOREADC[sid=%d]", conf->SID());
-      return false;
-    }
-    fTriggers.push_back(std::move(trig));
   }
 
   // sorting ADCs with SID
