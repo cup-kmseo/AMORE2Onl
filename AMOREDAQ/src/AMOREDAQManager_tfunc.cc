@@ -68,7 +68,6 @@ void AMOREDAQManager::TF_ReadData_AMORE()
 
       {
         std::lock_guard<std::mutex> lock(fMonitorMutex);
-        fTriggerNumber = adc0->GetCurrentTrgNumber();
         fCurrentTime = adc0->GetCurrentTime();
         fTriggerTime = fCurrentTime;
         for (std::size_t i = 0; i < nadc; ++i) {
@@ -201,6 +200,11 @@ void AMOREDAQManager::TF_SWTrigger(int n)
         allEmpty = false;
         const std::uint32_t pathbit = (1u << t);
 
+        {
+          std::lock_guard<std::mutex> lock(fMonitorMutex);
+          ++fTriggerNumber;
+        }
+
         for (int i = 0; i < nch; i += 2) {
           if (!chbit[i]) continue;
           if (i + 1 >= nch) {
@@ -222,8 +226,8 @@ void AMOREDAQManager::TF_SWTrigger(int n)
           xtal.SetWaveforms(phonon.data(), photon.data(), ndp);
           fTriggeredCrystals.push_back(xtal);
 
-          INFO("Crystal id=%d [sid=%d] triggered at t=%lu (path %d)",
-               xtal.id, adc->GetSID(), trgtime, t);
+          //INFO("Crystal id=%d [sid=%d] triggered at t=%lu (path %d)",
+          //     xtal.id, adc->GetSID(), trgtime, t);
         }
       }
       else if (ret == 0) {

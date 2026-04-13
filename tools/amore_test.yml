@@ -15,7 +15,7 @@ AMOREADC:
     RL: 10000     # Record length [samples]
     DLY: 0        # Delay [samples]
     ZSU: 1        # Zero suppression
-    PTRG: 100     # Pedestal trigger rate [Hz]
+    PTRG: 10      # Pedestal trigger rate [Hz]
     TRGMODE: RandomTrigger
   - SID: 2
     ENABLED: 1
@@ -28,7 +28,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 100
+    PTRG: 10
     TRGMODE: RandomTrigger
   - SID: 3
     ENABLED: 1
@@ -41,7 +41,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 100
+    PTRG: 10
     TRGMODE: RandomTrigger
   - SID: 4
     ENABLED: 1
@@ -54,7 +54,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 100
+    PTRG: 10
     TRGMODE: RandomTrigger
   - SID: 5
     ENABLED: 1
@@ -67,7 +67,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 100
+    PTRG: 10
     TRGMODE: RandomTrigger
   - SID: 6
     ENABLED: 1
@@ -80,7 +80,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 100
+    PTRG: 10
     TRGMODE: RandomTrigger
   - SID: 7
     ENABLED: 1
@@ -93,7 +93,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 100
+    PTRG: 10
     TRGMODE: RandomTrigger
   - SID: 8
     ENABLED: 1
@@ -106,5 +106,5 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 100
+    PTRG: 10
     TRGMODE: RandomTrigger

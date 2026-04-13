@@ -33,12 +33,12 @@ bool RandomTrigger::Prepare()
   // Calculate the probability for a single bin to fire.
   fProbPerBin = (fRate * static_cast<double>(fDSR)) / 1000000.0;
 
-  // Reset deadtime counters
+  fDeadtime = 0;
   for (int i = 0; i < AMORE::kNCHPERADC; ++i) {
-    fDeadtime[i] = fConfig->DT(i);
     fTrgOn[i] = fConfig->TRGON(i);
-    fDeadtimeCounters[i] = 0;
+    if (fTrgOn[i] && fDeadtime == 0) fDeadtime = fConfig->DT(i);
   }
+  fDeadtimeCounter = 0;
 
   std::random_device rd;
   fRNG.seed(rd());
@@ -64,23 +64,19 @@ int RandomTrigger::DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned sh
 
     bool fired = false;
 
-    // Evaluate each channel
-    for (int ch = 0; ch < nChannels; ++ch) {
-      if (trgbit) trgbit[ch] = false;
+    if (trgbit) {
+      for (int ch = 0; ch < nChannels; ++ch) trgbit[ch] = false;
+    }
 
-      // 1. Process Deadtime counter (always decrement if time passes)
-      if (fDeadtimeCounters[ch] > 0) { fDeadtimeCounters[ch]--; }
-
-      // 2. Skip trigger evaluation if TRGON is false OR still in Deadtime
-      if (!fTrgOn[ch] || fDeadtimeCounters[ch] > 0) { continue; }
-
-      // 3. Evaluate random trigger condition
-      if (fDist(fRNG) < fProbPerBin) {
-        fired = true;
-        if (trgbit) trgbit[ch] = true;
-
-        // 4. Set Channel-specific Deadtime counter
-        fDeadtimeCounters[ch] = fDeadtime[ch];
+    if (fDeadtimeCounter > 0) {
+      --fDeadtimeCounter;
+    }
+    else if (fDist(fRNG) < fProbPerBin) {
+      // Single trigger decision per time bin
+      fired = true;
+      fDeadtimeCounter = fDeadtime;
+      for (int ch = 0; ch < nChannels; ++ch) {
+        if (fTrgOn[ch] && trgbit) trgbit[ch] = true;
       }
     }
 

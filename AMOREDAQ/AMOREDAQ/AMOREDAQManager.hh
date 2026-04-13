@@ -33,6 +33,7 @@ public:
 
   bool AddADC(AbsConfList * conflist) override;
   bool PrepareDAQ() override;
+  void PrintDAQSummary() override;
 
   virtual void Run();
 
