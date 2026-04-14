@@ -17,7 +17,7 @@ bool RandomTrigger::PrepareAlgo()
   int dsr  = fConfig->SR();
   int rate = fConfig->PTRG();
 
-  fProbPerBin = (rate * static_cast<double>(dsr)) / 1000000.0;
+  fProbPerBin = (rate * static_cast<double>(dsr)) / 1e12;
 
   std::random_device rd;
   fRNG.seed(rd());

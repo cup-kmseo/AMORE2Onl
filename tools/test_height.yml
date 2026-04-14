@@ -15,7 +15,7 @@ AMOREADC:
     RL: 10000     # Record length [samples]
     DLY: 0        # Delay [samples]
     ZSU: 1        # Zero suppression
-    PTRG: 10      # Pedestal trigger rate [Hz]
+    PTRG: 1000    # Pedestal trigger rate [uHz]  (1000 uHz = 1 mHz = 0.001 Hz)
     TRGMODE:
       - HeightTrigger
   - SID: 2
@@ -29,7 +29,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 10
+    PTRG: 1000
     TRGMODE:
       - HeightTrigger
   - SID: 3
@@ -43,7 +43,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 10
+    PTRG: 1000
     TRGMODE:
       - HeightTrigger
   - SID: 4
@@ -57,7 +57,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 10
+    PTRG: 1000
     TRGMODE:
       - HeightTrigger
   - SID: 5
@@ -71,7 +71,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 10
+    PTRG: 1000
     TRGMODE:
       - HeightTrigger
   - SID: 6
@@ -85,7 +85,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 10
+    PTRG: 1000
     TRGMODE:
       - HeightTrigger
   - SID: 7
@@ -99,7 +99,7 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 10
+    PTRG: 1000
     TRGMODE:
       - HeightTrigger
   - SID: 8
@@ -113,6 +113,6 @@ AMOREADC:
     RL: 10000
     DLY: 0
     ZSU: 1
-    PTRG: 10
+    PTRG: 1000
     TRGMODE:
       - HeightTrigger
