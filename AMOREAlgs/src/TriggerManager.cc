@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "AMOREAlgs/ButterworthTrigger.hh"
+#include "AMOREAlgs/HeightTrigger.hh"
 #include "AMOREAlgs/RValueTrigger.hh"
 #include "AMOREAlgs/RandomTrigger.hh"
 #include "AMOREAlgs/TriggerManager.hh"
@@ -15,6 +16,9 @@ TriggerManager::TriggerManager()
 
   RegisterTriggerType("RValueTrigger",
                       [](const char * name) { return std::make_unique<RValueTrigger>(name); });
+
+  RegisterTriggerType("HeightTrigger",
+                      [](const char * name) { return std::make_unique<HeightTrigger>(name); });
 }
 
 void TriggerManager::RegisterTriggerType(const std::string & typeName, TriggerCreator creator)

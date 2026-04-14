@@ -206,6 +206,7 @@ void AMOREDAQManager::ReadConfigADC(YAML::Node ymlnode)
       FillConfigArray<int>(node["PID"], nch, [&](int i, int v) { conf->SetPID(i, v); }, true);
       FillConfigArray<int>(node["TRGON"], nch, [&](int i, int v) { conf->SetTRGON(i, v); });
       FillConfigArray<int>(node["DT"], nch, [&](int i, int v) { conf->SetDT(i, v); });
+      FillConfigArray<int>(node["THR"], nch, [&](int i, int v) { conf->SetTHR(i, v); });
     }
 
     fConfigList->Add(conf);

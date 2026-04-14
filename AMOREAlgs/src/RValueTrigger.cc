@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "AMOREAlgs/RValueTrigger.hh"
 
 RValueTrigger::RValueTrigger()
@@ -12,43 +10,14 @@ RValueTrigger::RValueTrigger(const char * name)
 {
 }
 
-bool RValueTrigger::Prepare()
+bool RValueTrigger::PrepareAlgo()
 {
-  if (!fConfig) {
-    std::cerr << "RValueTrigger::Prepare - Configuration is not set!" << std::endl;
-    return false;
-  }
-
-  try {
-    InitFIFO();
-  }
-  catch (const std::exception & e) {
-    std::cerr << "RValueTrigger::Prepare - FIFO Init failed: " << e.what() << std::endl;
-    return false;
-  }
-
-  // TODO: Initialize R-value parameters here
-
+  // TODO: Initialize R-value parameters from config
   return true;
 }
 
-int RValueTrigger::DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned short ** adcval,
-                             unsigned long * timetag)
+bool RValueTrigger::EvalChannel(int /*ch*/, unsigned short /*adcVal*/)
 {
-  if (!fFIFO) return -1;
-
-  unsigned short currentBinADC[16];
-  unsigned long currentBinTime = 0;
-
-  while (true) {
-    int popStatus = fFIFO->PopCurrent(currentBinADC, currentBinTime);
-
-    if (popStatus == 1) return 0; // Wait for more data
-    if (popStatus < 0) return -1; // FIFO Error
-
-    // TODO: Implement R-value calculation and trigger logic
-    // For now, it just consumes data and never triggers.
-  }
-
-  return 0;
+  // TODO: Compute R-value and return true when it exceeds fTHR[ch]
+  return false;
 }

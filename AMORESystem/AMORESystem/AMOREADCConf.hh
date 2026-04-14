@@ -16,7 +16,8 @@ public:
   void SetCID(int ch, int val) override;
   void SetPID(int ch, int val) override;
   void SetTRGON(int ch, int val);
-  void SetDT(int ch, int val);  
+  void SetDT(int ch, int val);
+  void SetTHR(int ch, int val);
   void SetSR(int val);
   void SetRL(int val);
   void SetDLY(int val);
@@ -30,6 +31,7 @@ public:
   int PID(int ch) const override;
   int TRGON(int ch) const;
   int DT(int ch) const;
+  int THR(int ch) const;
   int SR() const;
   int RL() const;
   int DLY() const;
@@ -50,6 +52,7 @@ private:
   int fPID[AMORE::kNCHPERADC]{};
   int fTRGON[AMORE::kNCHPERADC]{};
   int fDT[AMORE::kNCHPERADC]{};
+  int fTHR[AMORE::kNCHPERADC]{};
   
   std::vector<std::string> fTRGMODEs{};
 
@@ -80,6 +83,8 @@ inline void AMOREADCConf::SetTRGON(int ch, int val) { fTRGON[ch] = val; }
 
 inline void AMOREADCConf::SetDT(int ch, int val) { fDT[ch] = val; }
 
+inline void AMOREADCConf::SetTHR(int ch, int val) { fTHR[ch] = val; }
+
 inline int AMOREADCConf::NCH() const { return fNCH; }
 
 inline int AMOREADCConf::SR() const { return fSR; }
@@ -100,3 +105,5 @@ inline int AMOREADCConf::PID(int ch) const { return fPID[ch]; }
 inline int AMOREADCConf::TRGON(int ch) const { return fTRGON[ch]; }
 
 inline int AMOREADCConf::DT(int ch) const { return fDT[ch]; }
+
+inline int AMOREADCConf::THR(int ch) const { return fTHR[ch]; }

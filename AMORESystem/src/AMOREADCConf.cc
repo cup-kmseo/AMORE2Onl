@@ -49,6 +49,10 @@ void AMOREADCConf::PrintConf() const
     for (int i = 8 * j; i < 8 * (j + 1); i++)
       std::cout << Form("%6d", fDT[i]);
     std::cout << std::endl;
+    std::cout << "        THR : ";
+    for (int i = 8 * j; i < 8 * (j + 1); i++)
+      std::cout << Form("%6d", fTHR[i]);
+    std::cout << std::endl;
   }
   std::cout << " -----------------------------------------------" << std::endl;
   std::cout << std::endl;

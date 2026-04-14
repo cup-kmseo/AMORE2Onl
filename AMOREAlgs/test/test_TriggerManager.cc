@@ -1,7 +1,6 @@
 #include <iostream>
 #include <string>
 
-// Include AMORE framework headers
 #include "AMOREAlgs/AbsSWTrigger.hh"
 #include "AMOREAlgs/TriggerManager.hh"
 #include "AMORESystem/AMOREADCConf.hh"
@@ -28,7 +27,7 @@ int main()
   conf0.SetLink();
 
   AMOREADCConf conf1(2);
-  conf1.SetTRGMODE("ButterworthTrigger");
+  conf1.SetTRGMODE("RValueTrigger");
   conf1.SetEnable();
   conf1.SetLink();
 
@@ -37,9 +36,6 @@ int main()
   conf2.SetEnable();
   conf2.SetLink();
 
-  // Add configurations to the list.
-  // (Assuming TObjArray::Add() is sufficient for AbsConfList::GetNADC and GetConfig to work.
-  // If your framework requires a specific parser to populate AbsConfList, use that here instead.)
   confList.Add(&conf0);
   confList.Add(&conf1);
   confList.Add(&conf2);
@@ -47,7 +43,6 @@ int main()
   confList.Dump();
 
   std::cout << confList.GetNADC(ADC::AMOREADC) << std::endl;
-
   std::cout << "-> Mock configuration list created.\n" << std::endl;
 
   // ---------------------------------------------------------
@@ -67,10 +62,9 @@ int main()
   // ---------------------------------------------------------
   std::cout << "[Test 3] Verifying assigned triggers in the pool..." << std::endl;
 
-  // Note: This relies on GetNADC() correctly identifying the 3 added configs.
   const auto & trgs0 = trgManager.GetTriggers(0);
   if (!trgs0.empty()) std::cout << "-> ADC 0: Successfully got " << trgs0[0]->GetName() << std::endl;
-  else std::cerr << "-> ADC 0: Trigger is null (Check if GetConfig() works with Add())" << std::endl;
+  else std::cerr << "-> ADC 0: Trigger is null" << std::endl;
 
   const auto & trgs1 = trgManager.GetTriggers(1);
   if (!trgs1.empty()) std::cout << "-> ADC 1: Successfully got " << trgs1[0]->GetName() << std::endl;
@@ -88,14 +82,11 @@ int main()
   // ---------------------------------------------------------
   std::cout << "[Test 4] Testing PrepareAll()..." << std::endl;
 
-  // We expect this to fail gracefully because we haven't attached an actual ChunkDataFIFO
-  // and the AbsSWTrigger::Prepare() checks for fFIFO.
   bool prepResult = trgManager.PrepareAll();
 
   if (!prepResult) {
-    std::cout
-        << "-> SUCCESS: PrepareAll returned false as expected (No FIFO attached in this unit test)."
-        << std::endl;
+    std::cout << "-> SUCCESS: PrepareAll returned false as expected (No FIFO attached in this unit test)."
+              << std::endl;
   }
   else {
     std::cerr << "-> FAIL: PrepareAll returned true unexpectedly." << std::endl;

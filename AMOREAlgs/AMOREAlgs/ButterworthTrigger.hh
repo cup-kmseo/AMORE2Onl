@@ -2,18 +2,20 @@
 
 #include "AMOREAlgs/AbsSWTrigger.hh"
 
+// Per-channel Butterworth low-pass filtered amplitude trigger.
+// TODO: Implement filter coefficients and per-channel filter state.
 class ButterworthTrigger : public AbsSWTrigger {
 public:
   ButterworthTrigger();
   ButterworthTrigger(const char * name);
   virtual ~ButterworthTrigger() = default;
 
-  bool Prepare() override;
-  int DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned short ** adcval,
-                unsigned long * timetag = nullptr) override;
+protected:
+  bool PrepareAlgo() override;
+  bool EvalChannel(int ch, unsigned short adcVal) override;
 
 private:
-  // TODO: Add specific configuration variables for Butterworth filter
-  // double fCutoffFreq;
-  // int fOrder;
+  // TODO: Add Butterworth filter coefficients and per-channel state
+  // double fCoeffB[], fCoeffA[];
+  // double fState[kNCHPERADC][kFilterOrder]{};
 };

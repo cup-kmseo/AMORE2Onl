@@ -4,25 +4,20 @@
 
 #include "AMOREAlgs/AbsSWTrigger.hh"
 
+// Per-channel random trigger for testing.
+// Each enabled channel fires independently with probability proportional to PTRG (Hz).
 class RandomTrigger : public AbsSWTrigger {
 public:
   RandomTrigger();
   RandomTrigger(const char * name);
   virtual ~RandomTrigger() = default;
 
-  bool Prepare() override;
-  int DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned short ** adcval,
-                unsigned long * timetag = nullptr) override;
+protected:
+  bool PrepareAlgo() override;
+  bool EvalChannel(int ch, unsigned short adcVal) override;
 
 private:
-  int fDSR{10}; // Down sampling rate (Base: 1 MHz)
-  int fRate{1}; // Trigger rate per second (Hz)
-
-  int fTrgOn[AMORE::kNCHPERADC]; // Trigger Enable flag per channel
-  int fDeadtime;                  // Deadtime in bins (global, from config DT of first TRGON ch)
-  int fDeadtimeCounter;           // Remaining bins in deadtime
-
-  double fProbPerBin; // Calculated probability per single bin
+  double fProbPerBin{};
 
   std::mt19937 fRNG;
   std::uniform_real_distribution<double> fDist;

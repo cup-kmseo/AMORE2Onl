@@ -25,12 +25,23 @@ public:
   void Stop();
   bool IsFIFOEmpty() const;
 
-  virtual bool Prepare() = 0;
-  virtual int DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned short ** adcval,
-                        unsigned long * timetag = NULL) = 0;
+  // Common per-channel self-trigger framework.
+  // Subclasses implement PrepareAlgo() and EvalChannel() only.
+  bool Prepare();
+  int DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned short ** adcval,
+                unsigned long * timetag = nullptr);
 
 protected:
+  // Override in subclasses to perform algorithm-specific initialisation.
+  // Called by Prepare() after InitFIFO() and InitChannels().
+  virtual bool PrepareAlgo() { return true; }
+
+  // Per-channel trigger decision for a single time-bin sample.
+  // Return true to fire a trigger on this channel.
+  virtual bool EvalChannel(int ch, unsigned short adcVal) = 0;
+
   void InitFIFO();
+  void InitChannels();
 
 protected:
   std::string fName{};
@@ -45,6 +56,12 @@ protected:
   int fDebug{};
 
   std::mutex fMutex;
+
+  // Per-channel self-trigger state (populated by InitChannels)
+  int fTrgOn[AMORE::kNCHPERADC]{};
+  int fTHR[AMORE::kNCHPERADC]{};
+  int fDeadtime[AMORE::kNCHPERADC]{};
+  int fDeadtimeCounter[AMORE::kNCHPERADC]{};
 };
 
 inline void AbsSWTrigger::SetName(const char * name) { fName = name; }

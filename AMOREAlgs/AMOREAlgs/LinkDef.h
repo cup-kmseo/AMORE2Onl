@@ -9,5 +9,6 @@
 #pragma link C++ class RandomTrigger + ;
 #pragma link C++ class ButterworthTrigger + ;
 #pragma link C++ class RValueTrigger + ;
+#pragma link C++ class HeightTrigger + ;
 
 #endif

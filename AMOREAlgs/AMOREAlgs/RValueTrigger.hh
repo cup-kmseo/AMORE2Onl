@@ -2,17 +2,18 @@
 
 #include "AMOREAlgs/AbsSWTrigger.hh"
 
+// Per-channel R-value based trigger.
+// TODO: Implement R-value calculation per channel.
 class RValueTrigger : public AbsSWTrigger {
 public:
   RValueTrigger();
   RValueTrigger(const char * name);
   virtual ~RValueTrigger() = default;
 
-  bool Prepare() override;
-  int DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned short ** adcval,
-                unsigned long * timetag = nullptr) override;
+protected:
+  bool PrepareAlgo() override;
+  bool EvalChannel(int ch, unsigned short adcVal) override;
 
 private:
-  // TODO: Add specific variables for R-value calculation
-  // double fThreshold;
+  // TODO: Add R-value calculation state per channel
 };
