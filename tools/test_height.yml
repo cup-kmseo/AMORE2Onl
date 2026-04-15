@@ -10,12 +10,20 @@ AMOREADC:
     CID: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     PID: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
-    THR: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]
+    THR: [50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50]
+    DT: 6000      # Deadtime [samples]. 10 Hz sq.wave: HIGH=50ms=5000smp @SR=10
     SR: 10        # Down-sampling rate [us/sample] (base clock: 1 MHz)
     RL: 10000     # Record length [samples]
     DLY: 0        # Delay [samples]
     ZSU: 1        # Zero suppression
     PTRG: 1000    # Pedestal trigger rate [uHz]  (1000 uHz = 1 mHz = 0.001 Hz)
+    # Pile-up slope detection parameters (per-channel; scalar broadcasts to all channels)
+    # SLOPE_LB: look-back window [samples] for slope check while above threshold.
+    #           Set to ~1x signal rise time. Default: 200 (~2 ms @ SR=10 us)
+    # SLOPE_DT: deadtime [samples] after each detected pulse in slope mode.
+    #           Set to ~1.5x rise time. Default: 300 (~3 ms @ SR=10 us)
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
   - SID: 2
@@ -24,12 +32,15 @@ AMOREADC:
     CID: [1]
     PID: [17]
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
-    THR: [20]
+    THR: [50]
+    DT: 6000
     SR: 10
     RL: 10000
     DLY: 0
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
   - SID: 3
@@ -38,12 +49,15 @@ AMOREADC:
     CID: [1]
     PID: [33]
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
-    THR: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]
+    THR: [50]
+    DT: 6000
     SR: 10
     RL: 10000
     DLY: 0
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
   - SID: 4
@@ -52,12 +66,15 @@ AMOREADC:
     CID: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     PID: [49]
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
-    THR: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]
+    THR: [50]
+    DT: 6000
     SR: 10
     RL: 10000
     DLY: 0
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
   - SID: 5
@@ -66,12 +83,15 @@ AMOREADC:
     CID: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     PID: [65]
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
-    THR: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]
+    THR: [50]
+    DT: 6000
     SR: 10
     RL: 10000
     DLY: 0
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
   - SID: 6
@@ -80,12 +100,15 @@ AMOREADC:
     CID: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     PID: [81]
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
-    THR: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]
+    THR: [50]
+    DT: 6000
     SR: 10
     RL: 10000
     DLY: 0
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
   - SID: 7
@@ -94,12 +117,15 @@ AMOREADC:
     CID: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     PID: [97]
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
-    THR: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]
+    THR: [50]
+    DT: 6000
     SR: 10
     RL: 10000
     DLY: 0
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
   - SID: 8
@@ -108,11 +134,14 @@ AMOREADC:
     CID: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     PID: [113]
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
-    THR: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]
+    THR: [50]
+    DT: 6000
     SR: 10
     RL: 10000
     DLY: 0
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger

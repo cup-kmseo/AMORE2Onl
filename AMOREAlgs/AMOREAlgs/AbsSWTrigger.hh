@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -24,6 +25,12 @@ public:
 
   void Stop();
   bool IsFIFOEmpty() const;
+  void SetBaselines(const int * vals, int nch);
+
+  // Count distinct pulses in a single-channel waveform using the same
+  // baseline and threshold already configured for this trigger.
+  // Returns >= 1 (the triggering pulse itself); >= 2 means pile-up.
+  int CountPulses(int ch, const std::uint16_t * wave, int ndp) const;
 
   // Common per-channel self-trigger framework.
   // Subclasses implement PrepareAlgo() and EvalChannel() only.
@@ -62,6 +69,9 @@ protected:
   int fTHR[AMORE::kNCHPERADC]{};
   int fDeadtime[AMORE::kNCHPERADC]{};
   int fDeadtimeCounter[AMORE::kNCHPERADC]{};
+  int fBaseline[AMORE::kNCHPERADC]{};
+  int fSlopeLookBack[AMORE::kNCHPERADC]{};  // pile-up slope look-back window per channel
+  int fSlopeDeadtime[AMORE::kNCHPERADC]{};  // pile-up slope deadtime per channel
 };
 
 inline void AbsSWTrigger::SetName(const char * name) { fName = name; }
@@ -75,3 +85,9 @@ inline const char * AbsSWTrigger::GetName() const { return fName.c_str(); }
 inline void AbsSWTrigger::Stop() { if (fFIFO) fFIFO->Stop(); }
 
 inline bool AbsSWTrigger::IsFIFOEmpty() const { return !fFIFO || fFIFO->Empty(); }
+
+inline void AbsSWTrigger::SetBaselines(const int * vals, int nch)
+{
+  for (int ch = 0; ch < nch && ch < AMORE::kNCHPERADC; ++ch)
+    fBaseline[ch] = vals[ch];
+}

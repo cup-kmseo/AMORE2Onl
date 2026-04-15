@@ -224,6 +224,7 @@ void AMOREDAQManager::TF_SWTrigger(int n)
           }
 
           xtal.SetWaveforms(phonon.data(), photon.data(), ndp);
+          xtal.npulse = static_cast<std::uint16_t>(triggers[t]->CountPulses(i, phonon.data(), ndp));
           fTriggeredCrystals.push_back(xtal);
 
           //INFO("Crystal id=%d [sid=%d] triggered at t=%lu (path %d)",

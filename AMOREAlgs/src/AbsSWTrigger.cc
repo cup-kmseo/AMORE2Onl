@@ -26,6 +26,8 @@ void AbsSWTrigger::InitChannels()
     fTHR[ch]             = fConfig->THR(ch);
     fDeadtime[ch]        = fConfig->DT(ch);
     fDeadtimeCounter[ch] = 0;
+    fSlopeLookBack[ch]   = fConfig->SlopeLookBack(ch);
+    fSlopeDeadtime[ch]   = fConfig->SlopeDeadtime(ch);
   }
 }
 
@@ -98,4 +100,49 @@ int AbsSWTrigger::DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned sho
 void AbsSWTrigger::PushChunkData(unsigned char * data, int ndp)
 {
   fFIFO->PushChunk(data, ndp, fConfig);
+}
+
+int AbsSWTrigger::CountPulses(int ch, const std::uint16_t * wave, int ndp) const
+{
+  // Two detection modes:
+  //   1. Below threshold  → level crossing (same as HeightTrigger)
+  //   2. Above threshold  → slope detection: a new pulse riding on the tail
+  //                         of the previous one is identified by a sudden rise
+  //                         of > THR counts over lookBack samples.
+  // lookBack / deadtime are per-channel (configured via SLOPE_LB / SLOPE_DT in yml;
+  // defaults: 200 / 300 samples ≈ 2 ms / 3 ms at SR=10 µs).
+  const int lookBack = fSlopeLookBack[ch];
+  const int slopeDT  = fSlopeDeadtime[ch];
+
+  int  count    = 0;
+  bool above    = false;
+  int  deadtime = 0;
+
+  for (int j = 0; j < ndp; ++j) {
+    if (deadtime > 0) { --deadtime; continue; }
+
+    int val = static_cast<int>(wave[j]) - fBaseline[ch] - fTHR[ch];
+
+    if (!above) {
+      // --- level crossing: signal rises from below threshold ---
+      if (val > 0) {
+        ++count;
+        above    = true;
+        deadtime = slopeDT;
+      }
+    }
+    else {
+      // --- slope detection: look for a new pulse on top of the tail ---
+      if (j >= lookBack) {
+        int slope = static_cast<int>(wave[j]) - static_cast<int>(wave[j - lookBack]);
+        if (slope > fTHR[ch]) {
+          ++count;
+          deadtime = slopeDT;
+        }
+      }
+      if (val <= 0) above = false;
+    }
+  }
+
+  return (count > 0) ? count : 1; // at least 1 (the triggering pulse itself)
 }

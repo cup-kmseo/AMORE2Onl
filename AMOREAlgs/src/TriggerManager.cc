@@ -1,9 +1,11 @@
 #include <iostream>
 
 #include "AMOREAlgs/ButterworthTrigger.hh"
+#include "AMOREAlgs/FallingEdgeTrigger.hh"
 #include "AMOREAlgs/HeightTrigger.hh"
 #include "AMOREAlgs/RValueTrigger.hh"
 #include "AMOREAlgs/RandomTrigger.hh"
+#include "AMOREAlgs/RisingEdgeTrigger.hh"
 #include "AMOREAlgs/TriggerManager.hh"
 
 TriggerManager::TriggerManager()
@@ -19,6 +21,12 @@ TriggerManager::TriggerManager()
 
   RegisterTriggerType("HeightTrigger",
                       [](const char * name) { return std::make_unique<HeightTrigger>(name); });
+
+  RegisterTriggerType("RisingEdgeTrigger",
+                      [](const char * name) { return std::make_unique<RisingEdgeTrigger>(name); });
+
+  RegisterTriggerType("FallingEdgeTrigger",
+                      [](const char * name) { return std::make_unique<FallingEdgeTrigger>(name); });
 }
 
 void TriggerManager::RegisterTriggerType(const std::string & typeName, TriggerCreator creator)
@@ -75,6 +83,13 @@ const std::vector<std::unique_ptr<AbsSWTrigger>> & TriggerManager::GetTriggers(i
 {
   if (adcIndex < 0 || adcIndex >= static_cast<int>(fActivePool.size())) { return fEmpty; }
   return fActivePool[adcIndex];
+}
+
+void TriggerManager::SetBaselines(int adcIdx, const int * baselines, int nch)
+{
+  if (adcIdx < 0 || adcIdx >= static_cast<int>(fActivePool.size())) return;
+  for (auto & trig : fActivePool[adcIdx])
+    trig->SetBaselines(baselines, nch);
 }
 
 bool TriggerManager::PrepareAll()

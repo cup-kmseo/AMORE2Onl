@@ -51,6 +51,7 @@ private:
   void ReadConfigADC(YAML::Node ymlnode);
 
   bool HasRunningTrigger() const;
+  bool MeasurePedestal();
   void TF_ReadData_AMORE();
   void TF_StreamData();
   void TF_SWTrigger(int n);

@@ -1,8 +1,10 @@
+#include <chrono>
 #include <fstream>
 #include <limits>    // Required for std::numeric_limits
 #include <stdexcept> // For std::stoi exceptions
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "AMOREDAQ/AMOREDAQManager.hh"
 #include "AMORESystem/AMOREADC.hh"
@@ -207,6 +209,8 @@ void AMOREDAQManager::ReadConfigADC(YAML::Node ymlnode)
       FillConfigArray<int>(node["TRGON"], nch, [&](int i, int v) { conf->SetTRGON(i, v); });
       FillConfigArray<int>(node["DT"], nch, [&](int i, int v) { conf->SetDT(i, v); });
       FillConfigArray<int>(node["THR"], nch, [&](int i, int v) { conf->SetTHR(i, v); });
+      FillConfigArray<int>(node["SLOPE_LB"], nch, [&](int i, int v) { conf->SetSlopeLB(i, v); });
+      FillConfigArray<int>(node["SLOPE_DT"], nch, [&](int i, int v) { conf->SetSlopeDT(i, v); });
     }
 
     fConfigList->Add(conf);
@@ -269,6 +273,92 @@ bool AMOREDAQManager::PrepareDAQ()
   }
 
   INFO("prepared to take data from AMOREADC");
+
+  return true;
+}
+
+bool AMOREDAQManager::MeasurePedestal()
+{
+  const int nadc = GetEntries();
+  const int nch  = AMORE::kNCHPERADC;
+  const double kDuration = 1.0; // seconds
+
+  INFO("Measuring pedestal for %.1f seconds...", kDuration);
+
+  std::vector<std::vector<long>> sum(nadc, std::vector<long>(nch, 0));
+  std::vector<std::vector<long>> cnt(nadc, std::vector<long>(nch, 0));
+
+  auto tStart = std::chrono::steady_clock::now();
+
+  while (true) {
+    double elapsed =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - tStart).count();
+    if (elapsed >= kDuration) break;
+
+    int minBCount = ReadBCountMin();
+    if (minBCount < fMinimumBCount) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      continue;
+    }
+
+    for (int i = 0; i < nadc; ++i) {
+      if (ReadADCData(i, fMinimumBCount) < 0) {
+        ERROR("MeasurePedestal: ReadADCData failed at ADC #%d", i);
+        return false;
+      }
+
+      auto * adc  = static_cast<AbsADC *>(fCont[i]);
+      auto * conf = static_cast<AMOREADCConf *>(adc->GetConfig());
+
+      while (true) {
+        auto chunk = adc->Bpop_front();
+        if (!chunk) break;
+
+        int ndp = kKILOBYTES * chunk->size / 64;
+        unsigned char * data = chunk->data;
+
+        for (int j = 0; j < ndp; ++j) {
+          const int offset = j * 64;
+          for (int ch = 0; ch < nch; ++ch) {
+            if (conf->ZSU() && conf->PID(ch) == 0) continue;
+            unsigned int val = data[offset + ch * 3] & 0xFF;
+            val |= (static_cast<unsigned int>(data[offset + ch * 3 + 1] & 0xFF) << 8);
+            val |= (static_cast<unsigned int>(data[offset + ch * 3 + 2] & 0xFF) << 16);
+            sum[i][ch] += static_cast<unsigned short>(val);  // same truncation as PushChunk
+            cnt[i][ch]++;
+          }
+        }
+      }
+    }
+  }
+
+  // compute means, set baselines, and report
+  std::string report = "\n\n";
+  report += "============ Pedestal Measurement ============\n";
+
+  for (int i = 0; i < nadc; ++i) {
+    auto * adc = static_cast<AbsADC *>(fCont[i]);
+
+    int baselines[nch];
+    for (int ch = 0; ch < nch; ++ch)
+      baselines[ch] = (cnt[i][ch] > 0) ? static_cast<int>(sum[i][ch] / cnt[i][ch]) : 0;
+
+    fTriggerManager.SetBaselines(i, baselines, nch);
+
+    report += Form(" SID %2d\n", adc->GetSID());
+    for (int row = 0; row < 4; ++row) {
+      report += "  ";
+      for (int ch = row * 4; ch < (row + 1) * 4; ++ch)
+        report += Form("ch%02d: %5d  ", ch, baselines[ch]);
+      report += "\n";
+    }
+  }
+  report += "==============================================\n";
+  INFO("%s", report.c_str());
+
+  // clear ADC buffers so TF_ReadData starts from fresh data
+  for (int i = 0; i < nadc; ++i)
+    static_cast<AbsADC *>(fCont[i])->Bclear();
 
   return true;
 }

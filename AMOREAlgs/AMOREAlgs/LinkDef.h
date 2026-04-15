@@ -10,5 +10,7 @@
 #pragma link C++ class ButterworthTrigger + ;
 #pragma link C++ class RValueTrigger + ;
 #pragma link C++ class HeightTrigger + ;
+#pragma link C++ class RisingEdgeTrigger + ;
+#pragma link C++ class FallingEdgeTrigger + ;
 
 #endif

@@ -12,5 +12,5 @@ HeightTrigger::HeightTrigger(const char * name)
 
 bool HeightTrigger::EvalChannel(int ch, unsigned short adcVal)
 {
-  return adcVal > static_cast<unsigned short>(fTHR[ch]);
+  return adcVal > fBaseline[ch] + fTHR[ch];
 }

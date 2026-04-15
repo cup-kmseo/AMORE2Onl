@@ -23,6 +23,8 @@ public:
   void SetDLY(int val);
   void SetZSU(int val);
   void SetPTRG(int val);
+  void SetSlopeLB(int ch, int val);
+  void SetSlopeDT(int ch, int val);
   void SetTRGMODE(const char * mode);   // 단일 모드 설정 (기존 목록 초기화)
   void AddTRGMODE(const char * mode);   // 모드 추가
 
@@ -37,6 +39,8 @@ public:
   int DLY() const;
   int ZSU() const;
   int PTRG() const;
+  int SlopeLookBack(int ch) const;  // returns 200 if not set
+  int SlopeDeadtime(int ch) const;  // returns 300 if not set
   const std::vector<std::string> & TRGMODEs() const;
 
   void PrintConf() const override;
@@ -53,6 +57,8 @@ private:
   int fTRGON[AMORE::kNCHPERADC]{};
   int fDT[AMORE::kNCHPERADC]{};
   int fTHR[AMORE::kNCHPERADC]{};
+  int fSlopeLB[AMORE::kNCHPERADC]{};  // pile-up: slope look-back window [samples]
+  int fSlopeDT[AMORE::kNCHPERADC]{};  // pile-up: slope deadtime [samples]
   
   std::vector<std::string> fTRGMODEs{};
 
@@ -84,6 +90,15 @@ inline void AMOREADCConf::SetTRGON(int ch, int val) { fTRGON[ch] = val; }
 inline void AMOREADCConf::SetDT(int ch, int val) { fDT[ch] = val; }
 
 inline void AMOREADCConf::SetTHR(int ch, int val) { fTHR[ch] = val; }
+
+inline void AMOREADCConf::SetSlopeLB(int ch, int val) { fSlopeLB[ch] = val; }
+
+inline void AMOREADCConf::SetSlopeDT(int ch, int val) { fSlopeDT[ch] = val; }
+
+// default 200/300 samples (~2/3 ms at SR=10) if not configured in yml
+inline int AMOREADCConf::SlopeLookBack(int ch) const { return fSlopeLB[ch] > 0 ? fSlopeLB[ch] : 200; }
+
+inline int AMOREADCConf::SlopeDeadtime(int ch) const { return fSlopeDT[ch] > 0 ? fSlopeDT[ch] : 300; }
 
 inline int AMOREADCConf::NCH() const { return fNCH; }
 

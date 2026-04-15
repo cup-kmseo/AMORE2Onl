@@ -50,9 +50,16 @@ void AMOREDAQManager::RC_AMOREDAQ()
     th_swt[i] = std::thread(&AMOREDAQManager::TF_SWTrigger, this, i);
   }
 
-  // sleep for 1 secs
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   fTCB.TriggerStart();
+  if (!MeasurePedestal()) {
+    RUNSTATE::SetError(fRunStatus);
+    fTCB.TriggerStop();
+    th1.join(); th2.join();
+    for (int i = 0; i < nadc; ++i) th_swt[i].join();
+    th3.join();
+    CloseDAQ(); fTCB.Close();
+    return;
+  }
   RUNSTATE::SetState(fRunStatus, RUNSTATE::kRUNNING);
 
   // sleep for set DAQ time, printing status every 10 seconds

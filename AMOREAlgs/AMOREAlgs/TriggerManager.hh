@@ -31,6 +31,9 @@ public:
   // Prepare all initialized triggers in the pool
   bool PrepareAll();
 
+  // Set per-channel baseline values for all triggers assigned to a given ADC index
+  void SetBaselines(int adcIdx, const int * baselines, int nch);
+
 private:
   // Map of available trigger types (Name -> Creation Function)
   std::map<std::string, TriggerCreator> fRegistry;
