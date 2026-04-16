@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 #include <yaml-cpp/yaml.h>
@@ -49,6 +50,9 @@ private:
 
   void ReadConfigTCB(YAML::Node ymlnode);
   void ReadConfigADC(YAML::Node ymlnode);
+  void ReadConfigDAQ(YAML::Node ymlnode);
+
+  void LaunchDAQServers();
 
   bool HasRunningTrigger() const;
   bool MeasurePedestal();
@@ -69,6 +73,9 @@ private:
   PROCSTATE fTrigStatus[AMORE::kNADCAMOREADC];
 
   unsigned long fTimeDelta;
+
+  // per-daqserver output paths (keyed by DAQ ID), populated from YAML DAQ.Output
+  std::map<int, std::string> fDAQOutputs;
 
   ClassDef(AMOREDAQManager, 0)
 };

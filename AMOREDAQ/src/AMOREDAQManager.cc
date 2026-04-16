@@ -1,7 +1,8 @@
 #include <chrono>
+#include <cmath>
 #include <fstream>
-#include <limits>    // Required for std::numeric_limits
-#include <stdexcept> // For std::stoi exceptions
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -75,6 +76,7 @@ bool AMOREDAQManager::ReadConfig()
 
           ReadConfigTCB(inc_node);
           ReadConfigADC(inc_node);
+          ReadConfigDAQ(inc_node);
 
           INFO("Included config %s is successfully loaded", inc_file.c_str());
         }
@@ -87,6 +89,7 @@ bool AMOREDAQManager::ReadConfig()
 
     ReadConfigTCB(node);
     ReadConfigADC(node);
+    ReadConfigDAQ(node);
 
     INFO("reading config %s is done", filename.c_str());
 
@@ -277,22 +280,60 @@ bool AMOREDAQManager::PrepareDAQ()
   return true;
 }
 
+void AMOREDAQManager::ReadConfigDAQ(YAML::Node ymlnode)
+{
+  if (!ymlnode["DAQ"]) return;
+
+  // Only one DAQConf allowed — skip if already added
+  if (fConfigList->GetDAQConfig()) return;
+
+  auto * conf = new DAQConf();
+
+  for (const auto & d : ymlnode["DAQ"]) {
+    int id            = d["ID"]   ? d["ID"].as<int>()              : -1;
+    std::string name  = d["Name"] ? d["Name"].as<std::string>()    : "UNKNOWN";
+    std::string ip    = d["IP"]   ? d["IP"].as<std::string>()      : "127.0.0.1";
+    int port          = d["Port"] ? d["Port"].as<int>()            : 9000;
+
+    if (id < 0) {
+      ERROR("ReadConfigDAQ: DAQ entry missing ID, skipped");
+      continue;
+    }
+    conf->AddDAQ(id, name, ip, port);
+
+    if (d["Output"]) {
+      fDAQOutputs[id] = d["Output"].as<std::string>();
+    }
+
+    INFO("ReadConfigDAQ: id=%d name=%s ip=%s port=%d", id, name.c_str(), ip.c_str(), port);
+  }
+
+  fConfigList->Add(conf);
+}
+
 bool AMOREDAQManager::MeasurePedestal()
 {
-  const int nadc = GetEntries();
-  const int nch  = AMORE::kNCHPERADC;
-  const double kDuration = 1.0; // seconds
+  const int    nadc       = GetEntries();
+  const int    nch        = AMORE::kNCHPERADC;
+  const double kDuration  = 1.0;  // seconds of data to collect
+  const int    kNIter     = 3;    // sigma-clipping iterations
+  const double kSigmaCut  = 5.0;  // rejection threshold
 
-  INFO("Measuring pedestal for %.1f seconds...", kDuration);
+  INFO("Measuring pedestal (%.1f s, %d-iter %.0f-sigma clipping)...",
+       kDuration, kNIter, kSigmaCut);
 
-  std::vector<std::vector<long>> sum(nadc, std::vector<long>(nch, 0));
-  std::vector<std::vector<long>> cnt(nadc, std::vector<long>(nch, 0));
+  // ---------------------------------------------------------------
+  // Phase 1: collect raw samples per ADC per channel
+  // ---------------------------------------------------------------
+  // samples[adc][ch] holds all unsigned-short ADC values read
+  using SampleVec = std::vector<unsigned short>;
+  std::vector<std::vector<SampleVec>> samples(nadc, std::vector<SampleVec>(nch));
 
   auto tStart = std::chrono::steady_clock::now();
 
   while (true) {
     double elapsed =
-        std::chrono::duration<double>(std::chrono::steady_clock::now() - tStart).count();
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - tStart).count();
     if (elapsed >= kDuration) break;
 
     int minBCount = ReadBCountMin();
@@ -324,29 +365,82 @@ bool AMOREDAQManager::MeasurePedestal()
             unsigned int val = data[offset + ch * 3] & 0xFF;
             val |= (static_cast<unsigned int>(data[offset + ch * 3 + 1] & 0xFF) << 8);
             val |= (static_cast<unsigned int>(data[offset + ch * 3 + 2] & 0xFF) << 16);
-            sum[i][ch] += static_cast<unsigned short>(val);  // same truncation as PushChunk
-            cnt[i][ch]++;
+            samples[i][ch].push_back(static_cast<unsigned short>(val));
           }
         }
       }
     }
   }
 
-  // compute means, set baselines, and report
+  // ---------------------------------------------------------------
+  // Phase 2: iterative sigma clipping → baseline per channel
+  // ---------------------------------------------------------------
   std::string report = "\n\n";
   report += "============ Pedestal Measurement ============\n";
+  report += Form("  (%.0f-sigma clipping, %d iterations)\n", kSigmaCut, kNIter);
 
   for (int i = 0; i < nadc; ++i) {
     auto * adc = static_cast<AbsADC *>(fCont[i]);
 
     int baselines[nch];
-    for (int ch = 0; ch < nch; ++ch)
-      baselines[ch] = (cnt[i][ch] > 0) ? static_cast<int>(sum[i][ch] / cnt[i][ch]) : 0;
+
+    for (int ch = 0; ch < nch; ++ch) {
+      const SampleVec & sv = samples[i][ch];
+
+      if (sv.empty()) {
+        baselines[ch] = 0;
+        continue;
+      }
+
+      // valid[k] = true while sample sv[k] survives clipping
+      std::vector<bool> valid(sv.size(), true);
+      long nvalid = static_cast<long>(sv.size());
+
+      for (int iter = 0; iter < kNIter; ++iter) {
+        if (nvalid == 0) break;
+
+        // compute mean of surviving samples
+        double sum = 0.0;
+        for (size_t k = 0; k < sv.size(); ++k)
+          if (valid[k]) sum += sv[k];
+        double mean = sum / nvalid;
+
+        // compute std of surviving samples
+        double sum2 = 0.0;
+        for (size_t k = 0; k < sv.size(); ++k) {
+          if (!valid[k]) continue;
+          double d = sv[k] - mean;
+          sum2 += d * d;
+        }
+        double sigma = std::sqrt(sum2 / nvalid);
+
+        // clip samples beyond kSigmaCut * sigma
+        double lo = mean - kSigmaCut * sigma;
+        double hi = mean + kSigmaCut * sigma;
+        for (size_t k = 0; k < sv.size(); ++k) {
+          if (!valid[k]) continue;
+          if (sv[k] < lo || sv[k] > hi) {
+            valid[k] = false;
+            --nvalid;
+          }
+        }
+      }
+
+      // final mean from surviving samples
+      double sum = 0.0;
+      for (size_t k = 0; k < sv.size(); ++k)
+        if (valid[k]) sum += sv[k];
+      baselines[ch] = (nvalid > 0)
+        ? static_cast<int>(std::round(sum / nvalid))
+        : 0;
+    }
 
     fTriggerManager.SetBaselines(i, baselines, nch);
 
-    report += Form(" SID %2d\n", adc->GetSID());
-    for (int row = 0; row < 4; ++row) {
+    // report: grid of 4 channels per row, show baseline and surviving fraction
+    long total = static_cast<long>(samples[i][0].size());
+    report += Form(" SID %2d  (total samples/ch: %ld)\n", adc->GetSID(), total);
+    for (int row = 0; row < nch / 4; ++row) {
       report += "  ";
       for (int ch = row * 4; ch < (row + 1) * 4; ++ch)
         report += Form("ch%02d: %5d  ", ch, baselines[ch]);

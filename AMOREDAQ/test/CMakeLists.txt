@@ -1,5 +1,5 @@
 set ( TEST_SOURCES
-    amoretcb.cc
+    amoretcbdaq.cc
     amoredaq.cc
 )
 
