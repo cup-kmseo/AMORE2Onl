@@ -1,4 +1,4 @@
-# AMORE2Onl unified config — HeightTrigger (production)
+# AMORE2Onl unified config — HeightTrigger
 #
 # System:
 #   daq1 (DAQID=1): SID  1- 8 (8 ADCs, 128 ch, 64 crystals)
@@ -24,13 +24,8 @@
 # TRGON:   phonon channels (even indices) = 1, photon = 0.
 #
 # Usage:
-#   [testserver]  amoretcbdaq -c amore.yml -r <run#> -d 0 -t <seconds>
+#   [testserver]  amoretcbdaq -c amore_height.yml -r <run#> -d 0 -t <seconds>
 #   [daq1/2]  auto-launched via SSH by amoretcbdaq
-#
-# Prerequisites:
-#   - Passwordless SSH from master to each daqserver
-#   - amoredaq binary in PATH on all hosts (NFS install)
-#   - This config accessible at the same path on all hosts (NFS)
 
 DAQ:
   - ID: 0             # DAQ ID (0 = AMORETCB master)
@@ -72,6 +67,8 @@ AMOREADC:
     DLY: 5000         # Pre-trigger delay [samples]
     ZSU: 1            # Zero suppression (1=on, 0=off)
     PTRG: 1000        # Pedestal trigger rate [uHz]  (1000 uHz = 1 mHz = 0.001 Hz)
+    SLOPE_LB: 200     # Pile-up slope look-back [samples]
+    SLOPE_DT: 300     # Pile-up slope deadtime [samples]
     TRGMODE:
       - HeightTrigger # Trigger on pulse height exceeding THR
 
@@ -88,6 +85,8 @@ AMOREADC:
     DLY: 5000
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
 
@@ -104,6 +103,8 @@ AMOREADC:
     DLY: 5000
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
 
@@ -120,6 +121,8 @@ AMOREADC:
     DLY: 5000
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
 
@@ -136,6 +139,8 @@ AMOREADC:
     DLY: 5000
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
 
@@ -152,6 +157,8 @@ AMOREADC:
     DLY: 5000
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
 
@@ -168,6 +175,8 @@ AMOREADC:
     DLY: 5000
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
 
@@ -184,6 +193,8 @@ AMOREADC:
     DLY: 5000
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
 
@@ -204,6 +215,8 @@ AMOREADC:
     DLY: 5000
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
 
@@ -220,6 +233,8 @@ AMOREADC:
     DLY: 5000
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
 
@@ -236,6 +251,8 @@ AMOREADC:
     DLY: 5000
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger
 
@@ -252,5 +269,7 @@ AMOREADC:
     DLY: 5000
     ZSU: 1
     PTRG: 1000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
       - HeightTrigger

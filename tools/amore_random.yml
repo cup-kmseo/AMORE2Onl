@@ -1,4 +1,4 @@
-# AMORE2Onl unified config — HeightTrigger (production)
+# AMORE2Onl unified config — RandomTrigger
 #
 # System:
 #   daq1 (DAQID=1): SID  1- 8 (8 ADCs, 128 ch, 64 crystals)
@@ -24,13 +24,8 @@
 # TRGON:   phonon channels (even indices) = 1, photon = 0.
 #
 # Usage:
-#   [testserver]  amoretcbdaq -c amore.yml -r <run#> -d 0 -t <seconds>
+#   [testserver]  amoretcbdaq -c amore_random.yml -r <run#> -d 0 -t <seconds>
 #   [daq1/2]  auto-launched via SSH by amoretcbdaq
-#
-# Prerequisites:
-#   - Passwordless SSH from master to each daqserver
-#   - amoredaq binary in PATH on all hosts (NFS install)
-#   - This config accessible at the same path on all hosts (NFS)
 
 DAQ:
   - ID: 0             # DAQ ID (0 = AMORETCB master)
@@ -66,14 +61,16 @@ AMOREADC:
     CID: [1]          # Channel ID start — auto-increments from 1 to NCH
     PID: [1]          # Physical ID start — auto-increments (crystals 0-7)
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]  # Per-ch trigger enable; phonon=1, photon=0
-    THR: [20]         # Trigger threshold [ADC counts]
+    THR: [20]         # Trigger threshold [ADC counts]  (unused by RandomTrigger)
     SR: 10            # Down-sampling rate [us/sample] (base clock: 1 MHz)
     RL: 30000         # Record length [samples]
     DLY: 5000         # Pre-trigger delay [samples]
     ZSU: 1            # Zero suppression (1=on, 0=off)
-    PTRG: 1000        # Pedestal trigger rate [uHz]  (1000 uHz = 1 mHz = 0.001 Hz)
+    PTRG: 100000      # Pedestal trigger rate [uHz]  (1000 uHz = 1 mHz = 0.001 Hz)
+    SLOPE_LB: 200     # Pile-up slope look-back [samples]
+    SLOPE_DT: 300     # Pile-up slope deadtime [samples]
     TRGMODE:
-      - HeightTrigger # Trigger on pulse height exceeding THR
+      - RandomTrigger # Trigger at fixed random rate (set by PTRG)
 
   - SID: 2
     ENABLED: 1
@@ -87,9 +84,11 @@ AMOREADC:
     RL: 30000
     DLY: 5000
     ZSU: 1
-    PTRG: 1000
+    PTRG: 100000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - RandomTrigger
 
   - SID: 3
     ENABLED: 1
@@ -103,9 +102,11 @@ AMOREADC:
     RL: 30000
     DLY: 5000
     ZSU: 1
-    PTRG: 1000
+    PTRG: 100000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - RandomTrigger
 
   - SID: 4
     ENABLED: 1
@@ -119,9 +120,11 @@ AMOREADC:
     RL: 30000
     DLY: 5000
     ZSU: 1
-    PTRG: 1000
+    PTRG: 100000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - RandomTrigger
 
   - SID: 5
     ENABLED: 1
@@ -135,9 +138,11 @@ AMOREADC:
     RL: 30000
     DLY: 5000
     ZSU: 1
-    PTRG: 1000
+    PTRG: 100000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - RandomTrigger
 
   - SID: 6
     ENABLED: 1
@@ -151,9 +156,11 @@ AMOREADC:
     RL: 30000
     DLY: 5000
     ZSU: 1
-    PTRG: 1000
+    PTRG: 100000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - RandomTrigger
 
   - SID: 7
     ENABLED: 1
@@ -167,9 +174,11 @@ AMOREADC:
     RL: 30000
     DLY: 5000
     ZSU: 1
-    PTRG: 1000
+    PTRG: 100000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - RandomTrigger
 
   - SID: 8
     ENABLED: 1
@@ -183,9 +192,11 @@ AMOREADC:
     RL: 30000
     DLY: 5000
     ZSU: 1
-    PTRG: 1000
+    PTRG: 100000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - RandomTrigger
 
   # ================================================================
   # daq2 (DAQID: 2) — SID 9-12
@@ -203,9 +214,11 @@ AMOREADC:
     RL: 30000
     DLY: 5000
     ZSU: 1
-    PTRG: 1000
+    PTRG: 100000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - RandomTrigger
 
   - SID: 10
     ENABLED: 1
@@ -219,9 +232,11 @@ AMOREADC:
     RL: 30000
     DLY: 5000
     ZSU: 1
-    PTRG: 1000
+    PTRG: 100000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - RandomTrigger
 
   - SID: 11
     ENABLED: 1
@@ -235,9 +250,11 @@ AMOREADC:
     RL: 30000
     DLY: 5000
     ZSU: 1
-    PTRG: 1000
+    PTRG: 100000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - RandomTrigger
 
   - SID: 12
     ENABLED: 1
@@ -251,6 +268,8 @@ AMOREADC:
     RL: 30000
     DLY: 5000
     ZSU: 1
-    PTRG: 1000
+    PTRG: 100000
+    SLOPE_LB: 200
+    SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - RandomTrigger

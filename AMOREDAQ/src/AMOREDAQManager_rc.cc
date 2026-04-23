@@ -46,17 +46,26 @@ void AMOREDAQManager::LaunchDAQServers()
     std::string ip       = daqconf->GetIPAddr(id);
     std::string daq_name = daqconf->GetDAQName(id);
     std::string output   = fDAQOutputs.count(id) ? fDAQOutputs.at(id) : "/data/run";
-    std::string logfile  = Form("/tmp/%s.log", daq_name.c_str());
+    std::string logfile  = Form("/data/testData/LOG/%s.log", daq_name.c_str());
+
+    // Kill any leftover amoredaq process from a previous run so the port is free.
+    std::system(Form("ssh %s 'pkill -x amoredaq; true'", ip.c_str()));
+
+    // Derive absolute paths so the remote shell can locate both the binary and the config
+    // regardless of its working directory. RPATH in the binary covers all shared libraries.
+    std::filesystem::path bin_dir =
+      std::filesystem::read_symlink("/proc/self/exe").parent_path();
+    std::string amoredaq_bin = (bin_dir / "amoredaq").string();
+    std::string abs_config   = std::filesystem::absolute(fConfigFilename).string();
 
     // Build the remote command:
-    //   nohup amoredaq -c <config> -r <run> -d <id> -o <output> > <log> 2>&1 &
+    //   nohup <abs>/amoredaq -c <abs_config> -r <run> -d <id> -o <output> > <log> 2>&1 &
     std::string remote_cmd = Form(
-      "nohup amoredaq -c %s -r %d -d %d -o %s > %s 2>&1 &",
-      fConfigFilename.c_str(), fRunNumber, id,
+      "nohup %s -c %s -r %d -d %d -o %s > %s 2>&1 &",
+      amoredaq_bin.c_str(), abs_config.c_str(), fRunNumber, id,
       output.c_str(), logfile.c_str()
     );
 
-    // Wrap in SSH
     std::string ssh_cmd = Form("ssh %s '%s'", ip.c_str(), remote_cmd.c_str());
 
     INFO("[%s] launching: %s", daq_name.c_str(), ssh_cmd.c_str());
@@ -309,6 +318,7 @@ void AMOREDAQManager::RC_AMOREDAQ()
     if (isSlave) { fDoExit = true; th_msg.join(); }
     return;
   }
+  fTCB.SetConfig(fConfigList);
   if (!fTCB.Config()) {
     RUNSTATE::SetError(fRunStatus);
     ERROR("TCB config failed");
