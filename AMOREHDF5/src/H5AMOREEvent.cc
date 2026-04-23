@@ -264,6 +264,8 @@ herr_t H5AMOREEvent::FlushBuffer()
   fBufCount = 0;
   fBufBytesUsed = 0;
 
+  H5Fflush(fFile, H5F_SCOPE_GLOBAL);
+
   return status;
 }
 

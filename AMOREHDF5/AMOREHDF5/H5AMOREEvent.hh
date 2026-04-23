@@ -22,6 +22,8 @@ public:
   herr_t AppendEvent(const EventInfo_t & info, const std::vector<Crystal_t> & data);
   herr_t ReadEvent(int n) override;
 
+  herr_t Flush() { return fWriteTag ? FlushBuffer() : 0; }
+
   void SetNDP(int ndp);
   int GetNDP();
 

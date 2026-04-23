@@ -43,7 +43,7 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
   }
 
   // Read coincidence window from TCB config (CW is in samples, convert to ns)
-  auto * tcbconf = static_cast<AMORETCBConf *>(fConfigList->GetTCBConfig());
+  auto * tcbconf = static_cast<AMORETCBConf *>(fConfigList->FindConfig(ADC::AMORETCB, 0));
   const unsigned long cw = tcbconf ? static_cast<unsigned long>(tcbconf->CW()) * fTimeDelta : 0;
   INFO("Event building with coincidence window: %lu samples = %lu ns",
        tcbconf ? static_cast<unsigned long>(tcbconf->CW()) : 0, cw);
@@ -107,6 +107,7 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
         if (hasEvent && !flushEvent()) break;
         break;
       }
+      h5event->Flush();
       ThreadSleep(fWriteSleep, perror, integral, 0);
       continue;
     }
