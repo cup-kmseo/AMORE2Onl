@@ -28,6 +28,5 @@ int main(int argc, char ** argv)
 
   manager.Run();
 
-  delete &manager;
   return 0;
 }
