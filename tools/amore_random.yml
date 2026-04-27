@@ -36,12 +36,12 @@ DAQ:
     Name: AMOREDAQ1
     IP: "amoredaq1.cup.yemilab"
     Port: 9001
-    Output: "/data/testData/RAW/amoredaq1.h5"   # HDF5 output path
+    Output: "/data/testData/RAW"   # HDF5 output directory
   - ID: 2
     Name: AMOREDAQ2
     IP: "amoredaq2.cup.yemilab"
     Port: 9002
-    Output: "/data/testData/RAW/amoredaq2.h5"
+    Output: "/data/testData/RAW"
 
 AMORETCB:
   CW: 100     # Coincidence window [samples]  (ns = CW × SR × 1000)

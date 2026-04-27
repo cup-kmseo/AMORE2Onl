@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
@@ -45,8 +47,17 @@ void AMOREDAQManager::LaunchDAQServers()
 
     std::string ip       = daqconf->GetIPAddr(id);
     std::string daq_name = daqconf->GetDAQName(id);
-    std::string output   = fDAQOutputs.count(id) ? fDAQOutputs.at(id) : "/data/run";
-    std::string logfile  = Form("/data/testData/LOG/%s.log", daq_name.c_str());
+    std::string dir = fDAQOutputs.count(id) ? fDAQOutputs.at(id) : "/data/testData/RAW";
+
+    std::string daq_name_lower = daq_name;
+    std::transform(daq_name_lower.begin(), daq_name_lower.end(),
+                   daq_name_lower.begin(), ::tolower);
+
+    char run_str[16];
+    std::snprintf(run_str, sizeof(run_str), "%06d", fRunNumber);
+
+    std::string output  = dir + "/" + run_str + "/" + daq_name_lower + "_" + run_str + ".h5";
+    std::string logfile = Form("/data/testData/LOG/%s_%s.log", daq_name.c_str(), run_str);
 
     // Kill any leftover amoredaq process from a previous run so the port is free.
     std::system(Form("ssh %s 'pkill -x amoredaq; true'", ip.c_str()));
@@ -198,6 +209,7 @@ void AMOREDAQManager::RC_AMORETCB()
   // ----------------------------------------------------------
   const int kStatusInterval = 10;
   int elapsed = 0;
+  int split_elapsed = 0;
 
   // previous trigger count per daqserver (indexed by socket position)
   const int ndaqsockets = static_cast<int>(fDAQSocket.size());
@@ -214,6 +226,13 @@ void AMOREDAQManager::RC_AMORETCB()
     int sleepSec  = (remaining < kStatusInterval) ? remaining : kStatusInterval;
     std::this_thread::sleep_for(std::chrono::seconds(sleepSec));
     elapsed += sleepSec;
+    split_elapsed += sleepSec;
+
+    if (fOutputSplitTime > 0 && split_elapsed >= fOutputSplitTime) {
+      INFO("splitting output files on all daqservers");
+      SendCommandToDAQs("kSPLITOUTPUTFILE");
+      split_elapsed = 0;
+    }
 
     auto tnow = std::chrono::steady_clock::now();
     double dt  = std::chrono::duration<double>(tnow - tprev).count();

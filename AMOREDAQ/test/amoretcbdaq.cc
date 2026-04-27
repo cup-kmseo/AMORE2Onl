@@ -22,6 +22,7 @@ int main(int argc, char ** argv)
   manager.SetDAQID(option.daqid);
   manager.SetDAQTime(option.daqtime);
   manager.SetNEvent(option.daqevent);
+  manager.SetOutputSplitTime(option.sptime);
   manager.SetVerboseLevel(option.vlevel);
 
   manager.Run();

@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <filesystem>
 #include <string>
 
 #include "DAQUtils/ELog.hh"
@@ -24,8 +25,9 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
     return;
   }
 
-  if (OpenNewHDF5File(fOutputFilename.c_str()) < 0) {
-    ERROR("can't create hdf5 output file %s", fOutputFilename.c_str());
+  std::string first_file = fOutputFilename + ".00000";
+  if (OpenNewHDF5File(first_file.c_str()) < 0) {
+    ERROR("can't create hdf5 output file %s", first_file.c_str());
     RUNSTATE::SetError(fRunStatus);
     fWriteStatus = PROCSTATE::ERROR;
     return;
@@ -97,6 +99,21 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
 
   while (true) {
     if (fDoExit || RUNSTATE::CheckError(fRunStatus)) break;
+
+    if (fDoSplitOutputFile) {
+      if (hasEvent && !flushEvent()) break;
+      h5event->Flush();
+      fSubRunNumber += 1;
+      char newname[512];
+      std::snprintf(newname, sizeof(newname), "%s.%05d", fOutputFilename.c_str(), fSubRunNumber);
+      if (OpenNewHDF5File(newname) < 0) {
+        ERROR("can't create split hdf5 output file %s", newname);
+        RUNSTATE::SetError(fRunStatus);
+        fWriteStatus = PROCSTATE::ERROR;
+        break;
+      }
+      fDoSplitOutputFile = false;
+    }
 
     auto popped = fTriggeredCrystals.pop_front();
 
@@ -174,6 +191,12 @@ long AMOREDAQManager::OpenNewHDF5File(const char * filename)
   }
 
   if (subnum == 0) {
+    namespace fs = std::filesystem;
+    fs::path parent = fs::path(filename).parent_path();
+    if (!parent.empty() && !fs::exists(parent)) {
+      fs::create_directories(parent);
+      INFO("created output directory %s", parent.c_str());
+    }
     fHDF5File = new H5DataWriter(filename, fCompressionLevel);
     fHDF5File->SetSubrun(0);
   }
