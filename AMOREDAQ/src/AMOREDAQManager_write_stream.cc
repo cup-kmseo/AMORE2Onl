@@ -84,6 +84,7 @@ void AMOREDAQManager::TF_WriteStream_AMORE()
         streams[i]->Close();
       }
       H5Fflush(fid, H5F_SCOPE_GLOBAL);
+      { hsize_t fsz = 0; H5Fget_filesize(fid, &fsz); fTotalWrittenDataSize += static_cast<double>(fsz); }
       H5Fclose(fid);
 
       fSubRunNumber += 1;
@@ -161,7 +162,11 @@ void AMOREDAQManager::TF_WriteStream_AMORE()
     }
 
     if (RUNSTATE::CheckError(fRunStatus)) break;
-    if (!any_data) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    if (!any_data) {
+      for (int i = 0; i < nadc; ++i) streams[i]->Flush();
+      H5Fflush(fid, H5F_SCOPE_GLOBAL);
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
   }
 
   // --- Final flush and close ---
@@ -170,6 +175,7 @@ void AMOREDAQManager::TF_WriteStream_AMORE()
     streams[i]->Close();
   }
   H5Fflush(fid, H5F_SCOPE_GLOBAL);
+  { hsize_t fsz = 0; H5Fget_filesize(fid, &fsz); fTotalWrittenDataSize += static_cast<double>(fsz); }
   H5Fclose(fid);
 
   if (fWriteStatus != PROCSTATE::ERROR) fWriteStatus = ENDED;

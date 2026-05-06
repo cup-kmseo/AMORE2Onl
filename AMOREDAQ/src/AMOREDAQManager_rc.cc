@@ -511,9 +511,15 @@ void AMOREDAQManager::PrintDAQSummary()
   std::cout << std::endl;
   std::cout << Form("%32s", "Live time : ")              << Form("%.1f", liveTime) << " [s]" << std::endl;
   std::cout << Form("%32s", "Number of ADC : ")          << nadc << std::endl;
-  std::cout << Form("%32s", "Total number of trigger : ") << Form("%d", fTriggerNumber) << std::endl;
-  std::cout << Form("%32s", "Trigger rate : ")           << Form("%.2f", trate) << " [Hz]" << std::endl;
-  std::cout << Form("%32s", "Total number of event : ")  << Form("%d", fNBuiltEvent) << std::endl;
+  if (fContinuousMode) {
+    std::cout << Form("%32s", "Total number of trigger : ") << "N/A (continuous mode)" << std::endl;
+    std::cout << Form("%32s", "Trigger rate : ")            << "N/A (continuous mode)" << std::endl;
+    std::cout << Form("%32s", "Total number of event : ")   << "N/A (continuous mode)" << std::endl;
+  } else {
+    std::cout << Form("%32s", "Total number of trigger : ") << Form("%d", fTriggerNumber) << std::endl;
+    std::cout << Form("%32s", "Trigger rate : ")            << Form("%.2f", trate) << " [Hz]" << std::endl;
+    std::cout << Form("%32s", "Total number of event : ")   << Form("%d", fNBuiltEvent) << std::endl;
+  }
   std::cout << std::endl;
   std::cout << Form("%32s", "Received data size : ")
             << Form("%.3f GBytes (%.3f MB/sec)", recvDataSize, drate) << std::endl;
