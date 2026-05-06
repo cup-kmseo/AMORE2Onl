@@ -86,6 +86,20 @@ bool AMOREDAQManager::ReadConfig()
       }
     }
 
+    if (node["MODE"]) {
+      std::string mode_str = node["MODE"].as<std::string>();
+      if (mode_str == "continuous") {
+        fContinuousMode = true;
+        INFO("DAQ mode: continuous");
+      } else if (mode_str == "triggered") {
+        INFO("DAQ mode: triggered");
+      } else {
+        WARNING("Unknown MODE '%s' — defaulting to triggered", mode_str.c_str());
+      }
+    } else {
+      INFO("DAQ mode: triggered (default)");
+    }
+
     ReadConfigTCB(node);
     ReadConfigADC(node);
     ReadConfigDAQ(node);
@@ -230,14 +244,15 @@ bool AMOREDAQManager::PrepareDAQ()
     return false;
   }
 
-  // preparing software triggers via TriggerManager
-  if (!fTriggerManager.BuildTriggers(fConfigList)) {
-    ERROR("TriggerManager::BuildTriggers failed");
-    return false;
-  }
-  if (!fTriggerManager.PrepareAll()) {
-    ERROR("TriggerManager::PrepareAll failed");
-    return false;
+  if (!fContinuousMode) {
+    if (!fTriggerManager.BuildTriggers(fConfigList)) {
+      ERROR("TriggerManager::BuildTriggers failed");
+      return false;
+    }
+    if (!fTriggerManager.PrepareAll()) {
+      ERROR("TriggerManager::PrepareAll failed");
+      return false;
+    }
   }
 
   int dsr = 0;

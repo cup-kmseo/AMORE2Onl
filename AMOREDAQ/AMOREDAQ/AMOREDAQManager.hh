@@ -60,6 +60,7 @@ private:
   void TF_StreamData();
   void TF_SWTrigger(int n);
   void TF_WriteEvent_AMORE();
+  void TF_WriteStream_AMORE();
 
   long OpenNewHDF5File(const char * fname) override;
 
@@ -73,6 +74,8 @@ private:
   PROCSTATE fTrigStatus[AMORE::kNADCAMOREADC];
 
   unsigned long fTimeDelta;
+
+  bool fContinuousMode{false};
 
   // per-daqserver output paths (keyed by DAQ ID), populated from YAML DAQ.Output
   std::map<int, std::string> fDAQOutputs;

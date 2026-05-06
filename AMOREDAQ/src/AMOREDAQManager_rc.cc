@@ -383,10 +383,14 @@ void AMOREDAQManager::RC_AMOREDAQ()
   // ----------------------------------------------------------
   const int nadc = GetEntries();
   th1 = std::thread(&AMOREDAQManager::TF_ReadData_AMORE, this);
-  th2 = std::thread(&AMOREDAQManager::TF_StreamData, this);
-  th3 = std::thread(&AMOREDAQManager::TF_WriteEvent_AMORE, this);
-  for (int i = 0; i < nadc; ++i) {
-    th_swt[i] = std::thread(&AMOREDAQManager::TF_SWTrigger, this, i);
+  if (fContinuousMode) {
+    th3 = std::thread(&AMOREDAQManager::TF_WriteStream_AMORE, this);
+  } else {
+    th2 = std::thread(&AMOREDAQManager::TF_StreamData, this);
+    th3 = std::thread(&AMOREDAQManager::TF_WriteEvent_AMORE, this);
+    for (int i = 0; i < nadc; ++i) {
+      th_swt[i] = std::thread(&AMOREDAQManager::TF_SWTrigger, this, i);
+    }
   }
 
   // ----------------------------------------------------------
@@ -453,9 +457,14 @@ void AMOREDAQManager::RC_AMOREDAQ()
   RUNSTATE::SetState(fRunStatus, RUNSTATE::kRUNENDED);
   time(&fEndDatime);
 
-  th1.join(); th2.join();
-  for (int i = 0; i < nadc; ++i) th_swt[i].join();
-  th3.join();
+  th1.join();
+  if (fContinuousMode) {
+    th3.join();
+  } else {
+    th2.join();
+    for (int i = 0; i < nadc; ++i) th_swt[i].join();
+    th3.join();
+  }
 
   CloseDAQ();
   fTCB.Close();
