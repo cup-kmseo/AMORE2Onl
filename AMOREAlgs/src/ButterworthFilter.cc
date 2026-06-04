@@ -140,7 +140,7 @@ void ButterworthFilter::ComputeDenomCoeffs()
   fDenC.resize(fNCoeffs);
   fDenC[1] = d[0];
   fDenC[0] = 1.0;
-  for (int k = 3; k <= 2 * fOrder; ++k)
+  for (int k = 2; k <= 2 * fOrder; ++k)
     fDenC[k] = d[2 * k - 2];
 }
 

@@ -119,8 +119,14 @@ bool RValueTrigger::PrepareAlgo()
     fRunSum[ch]     = 0.0;
     fRunSum2[ch]    = 0.0;
     fDSCounter[ch]  = 0;
+    fWarmupLeft[ch] = fConfig->DLY();
     fRVPrev[ch]     = 0.0;
     fRVPrevPrev[ch] = 0.0;
+    fARVPrev[ch]    = 0.0;
+    fRVPeak[ch]     = -1.0;
+    fARVPeak[ch]    = -1.0;
+    fLastRV[ch]     = 0.0;
+    fLastARV[ch]    = 0.0;
   }
 
   ftmplt->Close();
@@ -129,6 +135,11 @@ bool RValueTrigger::PrepareAlgo()
 
 bool RValueTrigger::EvalChannel(int ch, unsigned short adcVal)
 {
+  // Warmup: count raw samples, suppress trigger decisions until fDLY elapsed
+  // (mirrors "nprocessed >= fDELAY" in read_amod.C).
+  const bool in_warmup = (fWarmupLeft[ch] > 0);
+  if (in_warmup) --fWarmupLeft[ch];
+
   // Downsample: only compute R-value every fDS raw samples
   if (++fDSCounter[ch] < fDS) return false;
   fDSCounter[ch] = 0;
@@ -154,15 +165,41 @@ bool RValueTrigger::EvalChannel(int ch, unsigned short adcVal)
   double var   = fRunSum2[ch] / fNWin - mean * mean;
   double sigma = (var > 0) ? std::sqrt(var) : 0.0;
 
-  double rv = (sigma > 0 && fTstd[ch] > 0) ? cc / (sigma * fTstd[ch] * fNWin) : 0.0;
+  double rv  = (sigma > 0 && fTstd[ch] > 0) ? cc / (sigma * fTstd[ch] * fNWin) : 0.0;
+  double arv = (fTstd[ch] > 0) ? sigma / fTstd[ch] : 0.0;
 
-  // Local maximum detection: trigger when rv[n-1] was a peak above threshold
-  bool fired = (fRVPrevPrev[ch] <= fRVPrev[ch]) &&
-               (fRVPrev[ch] >= rv) &&
-               (fRVPrev[ch] > static_cast<double>(fTHR[ch]) * 1e-3);
+  // Local maximum detection: fRVPrev[ch] was a peak when it is >= both neighbours.
+  // This mirrors the dq_rvh[1] check in read_amod.C.
+  bool fired = false;
+  if (!in_warmup && fRVPrevPrev[ch] <= fRVPrev[ch] && fRVPrev[ch] >= rv) {
+    // Update peak RV and the ARV recorded at that peak (a_rvh / a_arvh in read_amod.C).
+    if (fRVPrev[ch] > fRVPeak[ch]) {
+      fRVPeak[ch]  = fRVPrev[ch];
+      fARVPeak[ch] = fARVPrev[ch];
+    }
+
+    double rv_thr = static_cast<double>(fTHR[ch]) * 1e-3;
+    if (fRVPrev[ch] > rv_thr) {
+      // Ellipse cut: RV² / THRY + ARV² / THRX > 1.
+      // Disabled (pass-through) when either threshold is zero (not configured).
+      double thry = fConfig->RVTHRY(ch);
+      double thrx = fConfig->RVTHRX(ch);
+      bool ellipse_ok = (thry <= 0 || thrx <= 0) ||
+                        (fRVPrev[ch] * fRVPrev[ch] / thry +
+                         fARVPeak[ch] * fARVPeak[ch] / thrx > 1.0);
+      if (ellipse_ok) {
+        fired        = true;
+        fLastRV[ch]  = fRVPrev[ch];
+        fLastARV[ch] = fARVPeak[ch];
+        fRVPeak[ch]  = -1.0;
+        fARVPeak[ch] = -1.0;
+      }
+    }
+  }
 
   fRVPrevPrev[ch] = fRVPrev[ch];
   fRVPrev[ch]     = rv;
+  fARVPrev[ch]    = arv;
 
   return fired;
 }

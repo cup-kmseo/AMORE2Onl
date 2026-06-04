@@ -31,6 +31,8 @@ public:
   void SetRVTmpltFile(const std::string & path);
   void SetRVNWin(int val);
   void SetRVDS(int val);
+  void SetRVTHRY(int ch, int val);  // ellipse RV²  axis: stored as (val*1e-3)²
+  void SetRVTHRX(int ch, int val);  // ellipse ARV² axis: stored as (val*1e-3)²
   void SetTRGMODE(const char * mode);   // 단일 모드 설정 (기존 목록 초기화)
   void AddTRGMODE(const char * mode);   // 모드 추가
 
@@ -53,6 +55,8 @@ public:
   const std::string & RVTmpltFile() const;
   int    RVNWin() const;
   int    RVDS() const;
+  double RVTHRY(int ch) const;  // 0 if not set (ellipse cut disabled)
+  double RVTHRX(int ch) const;
   const std::vector<std::string> & TRGMODEs() const;
 
   void PrintConf() const override;
@@ -77,6 +81,8 @@ private:
   std::string fRVTmpltFile{};
   int    fRVNWin{100};
   int    fRVDS{8};
+  double fRVTHRY[AMORE::kNCHPERADC]{};  // ellipse RV²  axis threshold
+  double fRVTHRX[AMORE::kNCHPERADC]{};  // ellipse ARV² axis threshold
 
   std::vector<std::string> fTRGMODEs{};
 
@@ -137,6 +143,10 @@ inline void AMOREADCConf::SetBWFUC(double val)              { fBWFUC = val; }
 inline void AMOREADCConf::SetRVTmpltFile(const std::string & path) { fRVTmpltFile = path; }
 inline void AMOREADCConf::SetRVNWin(int val)                { fRVNWin = val; }
 inline void AMOREADCConf::SetRVDS(int val)                  { fRVDS = val; }
+inline void AMOREADCConf::SetRVTHRY(int ch, int val)        { fRVTHRY[ch] = 1e-6 * val * val; }
+inline void AMOREADCConf::SetRVTHRX(int ch, int val)        { fRVTHRX[ch] = 1e-6 * val * val; }
+inline double AMOREADCConf::RVTHRY(int ch)  const { return fRVTHRY[ch]; }
+inline double AMOREADCConf::RVTHRX(int ch)  const { return fRVTHRX[ch]; }
 inline int    AMOREADCConf::BWFOrder()      const { return fBWFOrder; }
 inline double AMOREADCConf::BWFLC()        const { return fBWFLC; }
 inline double AMOREADCConf::BWFUC()        const { return fBWFUC; }

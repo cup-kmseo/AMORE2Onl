@@ -38,3 +38,19 @@ foreach ( src ${TEST_SOURCES} )
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
 endforeach ()
+
+# --- RValueTrigger offline replay test (requires HDF5) ---
+if ( CUPDAQ_ENABLE_HDF5 )
+    add_executable ( rv_trigger_test rv_trigger_test.cc )
+
+    target_link_libraries ( rv_trigger_test
+        PRIVATE
+            ${ROOT_LIBRARIES}
+            ${HDF5_LIBRARIES}
+            AMOREDAQ
+    )
+
+    install ( TARGETS rv_trigger_test
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif ()
