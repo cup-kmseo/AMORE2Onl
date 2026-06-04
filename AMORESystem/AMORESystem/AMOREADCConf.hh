@@ -25,6 +25,12 @@ public:
   void SetPTRG(int val);
   void SetSlopeLB(int ch, int val);
   void SetSlopeDT(int ch, int val);
+  void SetBWFOrder(int val);
+  void SetBWFLC(double val);
+  void SetBWFUC(double val);
+  void SetRVTmpltFile(const std::string & path);
+  void SetRVNWin(int val);
+  void SetRVDS(int val);
   void SetTRGMODE(const char * mode);   // 단일 모드 설정 (기존 목록 초기화)
   void AddTRGMODE(const char * mode);   // 모드 추가
 
@@ -39,8 +45,14 @@ public:
   int DLY() const;
   int ZSU() const;
   int PTRG() const;
-  int SlopeLookBack(int ch) const;  // returns 200 if not set
-  int SlopeDeadtime(int ch) const;  // returns 300 if not set
+  int    SlopeLookBack(int ch) const;  // returns 200 if not set
+  int    SlopeDeadtime(int ch) const;  // returns 300 if not set
+  int    BWFOrder() const;
+  double BWFLC() const;
+  double BWFUC() const;
+  const std::string & RVTmpltFile() const;
+  int    RVNWin() const;
+  int    RVDS() const;
   const std::vector<std::string> & TRGMODEs() const;
 
   void PrintConf() const override;
@@ -59,7 +71,13 @@ private:
   int fTHR[AMORE::kNCHPERADC]{};
   int fSlopeLB[AMORE::kNCHPERADC]{};  // pile-up: slope look-back window [samples]
   int fSlopeDT[AMORE::kNCHPERADC]{};  // pile-up: slope deadtime [samples]
-  
+  int    fBWFOrder{2};
+  double fBWFLC{0};
+  double fBWFUC{0};
+  std::string fRVTmpltFile{};
+  int    fRVNWin{100};
+  int    fRVDS{8};
+
   std::vector<std::string> fTRGMODEs{};
 
   ClassDef(AMOREADCConf, 1)
@@ -112,6 +130,19 @@ inline int AMOREADCConf::ZSU() const { return fZSU; }
 
 inline int AMOREADCConf::PTRG() const { return fPTRG; }
 
+
+inline void AMOREADCConf::SetBWFOrder(int val)              { fBWFOrder = val; }
+inline void AMOREADCConf::SetBWFLC(double val)              { fBWFLC = val; }
+inline void AMOREADCConf::SetBWFUC(double val)              { fBWFUC = val; }
+inline void AMOREADCConf::SetRVTmpltFile(const std::string & path) { fRVTmpltFile = path; }
+inline void AMOREADCConf::SetRVNWin(int val)                { fRVNWin = val; }
+inline void AMOREADCConf::SetRVDS(int val)                  { fRVDS = val; }
+inline int    AMOREADCConf::BWFOrder()      const { return fBWFOrder; }
+inline double AMOREADCConf::BWFLC()        const { return fBWFLC; }
+inline double AMOREADCConf::BWFUC()        const { return fBWFUC; }
+inline const std::string & AMOREADCConf::RVTmpltFile() const { return fRVTmpltFile; }
+inline int    AMOREADCConf::RVNWin()       const { return fRVNWin; }
+inline int    AMOREADCConf::RVDS()         const { return fRVDS; }
 
 inline int AMOREADCConf::CID(int ch) const { return fCID[ch]; }
 

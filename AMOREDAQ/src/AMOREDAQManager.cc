@@ -228,6 +228,12 @@ void AMOREDAQManager::ReadConfigADC(YAML::Node ymlnode)
       FillConfigArray<int>(node["SLOPE_LB"], nch, [&](int i, int v) { conf->SetSlopeLB(i, v); });
       FillConfigArray<int>(node["SLOPE_DT"], nch, [&](int i, int v) { conf->SetSlopeDT(i, v); });
     }
+    if (node["BWF_ORDER"]) conf->SetBWFOrder(node["BWF_ORDER"].as<int>());
+    if (node["BWF_LC"])    conf->SetBWFLC(node["BWF_LC"].as<double>());
+    if (node["BWF_UC"])    conf->SetBWFUC(node["BWF_UC"].as<double>());
+    if (node["RV_TMPLT"])  conf->SetRVTmpltFile(node["RV_TMPLT"].as<std::string>());
+    if (node["RV_NWIN"])   conf->SetRVNWin(node["RV_NWIN"].as<int>());
+    if (node["RV_DS"])     conf->SetRVDS(node["RV_DS"].as<int>());
 
     fConfigList->Add(conf);
   }
