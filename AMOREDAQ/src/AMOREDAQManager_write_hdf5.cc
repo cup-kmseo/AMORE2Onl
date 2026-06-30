@@ -2,8 +2,8 @@
 #include <filesystem>
 #include <string>
 
-#include "DAQUtils/ELog.hh"
-#include "HDF5Utils/H5DataWriter.hh"
+#include "ELog.hh"
+#include "H5DataWriter.hh"
 
 #include "AMOREHDF5/AMOREEDM.hh"
 #include "AMOREHDF5/H5AMOREEvent.hh"
@@ -20,7 +20,7 @@ bool AMOREDAQManager::HasRunningTrigger() const
 
 void AMOREDAQManager::TF_WriteEvent_AMORE()
 {
-  if (!ThreadWait(fRunStatus, fDoExit)) {
+  if (!WaitRunState(fRunStatus, RUNSTATE::kRUNNING, fDoExit)) {
     WARNING("Exited by exit command before starting");
     return;
   }
@@ -33,7 +33,7 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
     return;
   }
 
-  auto * adc0 = static_cast<AbsADC *>(fCont[0]);
+  auto * adc0 = fADCList[0].get();
   auto * conf0 = static_cast<AMOREADCConf *>(adc0->GetConfig());
   const int ndp = conf0->RL();
 
@@ -105,7 +105,7 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
       h5event->Flush();
       fSubRunNumber += 1;
       char newname[512];
-      std::snprintf(newname, sizeof(newname), "%s.%05d", fOutputFilename.c_str(), fSubRunNumber);
+      std::snprintf(newname, sizeof(newname), "%s.%05d", fOutputFilename.c_str(), fSubRunNumber.load());
       if (OpenNewHDF5File(newname) < 0) {
         ERROR("can't create split hdf5 output file %s", newname);
         RUNSTATE::SetError(fRunStatus);

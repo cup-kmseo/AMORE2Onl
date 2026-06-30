@@ -9,10 +9,9 @@ file ( GLOB MODULE_HEADERS CONFIGURE_DEPENDS ${MODULE_NAME}/*.hh )
 file ( GLOB MODULE_SOURCES CONFIGURE_DEPENDS src/*.cc )
 
 # --- Collect include dirs for dictionary
-# Note: Using HDF5_INCLUDE_DIRS (plural) for consistency
 set ( DICT_I_FLAGS
     -I${HDF5_INCLUDE_DIRS}
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/HDF5Utils
+    -I${CUPDATAMODEL_INCLUDE_DIR}
 )
 
 # Generate ROOT dictionary
@@ -42,7 +41,7 @@ target_link_libraries ( ${MODULE_NAME}
     PUBLIC
         ${ROOT_LIBRARIES}
         ${HDF5_LIBRARIES}
-        HDF5Utils
+        CUPDataModel::HDF5Utils
 )
 
 target_compile_definitions ( ${MODULE_NAME}

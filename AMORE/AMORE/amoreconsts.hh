@@ -1,8 +1,8 @@
 #pragma once
 
 #include <string_view>
-#include "OnlConsts/onlconsts.hh"
-#include "OnlConsts/adcconsts.hh"
+#include "onlconsts.hh"
+#include "adcconsts.hh"
 
 namespace AMORE {
     // Use constexpr for compile-time constants

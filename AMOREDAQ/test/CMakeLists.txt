@@ -17,22 +17,14 @@ foreach ( src ${TEST_SOURCES} )
         PRIVATE
             ${ROOT_LIBRARIES}
             PkgConfig::LIBUSB
-            DAQUtils
-            DAQConfig
-            DAQSystem
-            OnlObjs
-            RawObjs
-            Notice
+            CUPDAQ::DAQUtils
+            CUPDAQ::DAQConfig
+            CUPDAQ::DAQSystem
+            CUPDAQ::OnlObjs
+            CUPDataModel::RawObjs
+            CUPDAQ::Notice
             AMOREDAQ
     )
-
-    if ( CUPDAQ_ENABLE_HDF5 )
-        target_link_libraries ( ${test_name}
-            PRIVATE
-            ${HDF5_LIBRARIES}
-            HDF5Utils
-        )
-    endif ()
 
     install ( TARGETS ${test_name}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <cstring>
 
+#include "TError.h"
+
 #include "AMOREHDF5/H5AMOREEvent.hh"
 
 ClassImp(H5AMOREEvent)

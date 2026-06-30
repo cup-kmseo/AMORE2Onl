@@ -42,13 +42,22 @@ find_package ( HDF5 REQUIRED COMPONENTS C CXX HL )
 message ( STATUS "HDF5 found (${HDF5_VERSION}): enabling HDF5-based utilities" )
 add_compile_definitions ( ENABLE_HDF5 )
 
-# ---- Submodule: CUPDAQ ----
-# Force the CUPDAQ submodule to enable HDF5 features since it is now required.
-set ( CUPDAQ_ENABLE_HDF5 ON CACHE BOOL "Force HDF5 in CUPDAQ" FORCE )
+# ---- CUPDAQ & CUPDataModel (external shared packages) ----
+set ( CUPDAQ_ROOT "/home/cupsoft/Products/CUPDAQ/V4.3"
+      CACHE PATH "Path to installed CUPDAQ" )
+set ( CUPDATAMODEL_ROOT "/home/cupsoft/Products/CUPDATAMODEL/V1.1"
+      CACHE PATH "Path to installed CUPDataModel" )
+list ( APPEND CMAKE_PREFIX_PATH "${CUPDAQ_ROOT}" "${CUPDATAMODEL_ROOT}" )
 
-# Integrate the CUPDAQ core system
-message ( STATUS "Adding CUPDAQ submodule into AMORE2Onl..." )
-add_subdirectory ( CUPDAQ )
+find_package ( CUPDataModel REQUIRED )
+find_package ( CUPDAQ REQUIRED )
+
+set ( CUPDAQ_INCLUDE_DIR       "${CUPDAQ_ROOT}/include" )
+set ( CUPDATAMODEL_INCLUDE_DIR "${CUPDATAMODEL_ROOT}/include" )
+set ( CUPDAQ_ENABLE_HDF5 ON )
+
+message ( STATUS "CUPDAQ found: ${CUPDAQ_INCLUDE_DIR}" )
+message ( STATUS "CUPDataModel found: ${CUPDATAMODEL_INCLUDE_DIR}" )
 
 # ---- Global Compiler Settings ----
 add_compile_options ( -O2 )

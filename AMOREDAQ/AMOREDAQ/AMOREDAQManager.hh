@@ -7,17 +7,17 @@
 
 #include "AMOREAlgs/TriggerManager.hh"
 #include "AMORESystem/AMORETCB.hh"
-#include "DAQ/CupDAQManager.hh"
-#include "DAQConfig/AbsConf.hh"
-#include "DAQConfig/AbsConfList.hh"
+#include "CupDAQManager.hh"
+#include "AbsConf.hh"
+#include "AbsConfList.hh"
 #include "AMOREHDF5/AMOREEDM.hh"
-#include "OnlConsts/onlconsts.hh"
-#include "DAQUtils/ConcurrentDeque.hh"
+#include "onlconsts.hh"
+#include "ConcurrentDeque.hh"
 
 class AMOREDAQManager : public CupDAQManager {
 public:
   AMOREDAQManager();
-  ~AMOREDAQManager() override;
+  ~AMOREDAQManager();
 
   void SetRunNumber(int run);
   void SetDAQID(int id);

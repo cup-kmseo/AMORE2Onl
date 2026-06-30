@@ -5,8 +5,10 @@
 #include <cstdint>
 #include <vector>
 
+#include "Rtypes.h"
+
 #include "AMOREHDF5/AMOREEDM.hh"
-#include "HDF5Utils/AbsH5Event.hh"
+#include "AbsH5Event.hh"
 
 #include "hdf5.h"
 

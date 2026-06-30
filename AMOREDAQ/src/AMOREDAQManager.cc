@@ -2,6 +2,7 @@
 #include <cmath>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -11,9 +12,9 @@
 #include "AMORESystem/AMOREADC.hh"
 #include "AMORESystem/AMOREADCConf.hh"
 #include "AMORESystem/AMORETCBConf.hh"
-#include "DAQConfig/DAQConf.hh"
-#include "DAQUtils/ELog.hh"
-#include "OnlConsts/adcconsts.hh"
+#include "DAQConf.hh"
+#include "ELog.hh"
+#include "adcconsts.hh"
 
 ClassImp(AMOREDAQManager)
 
@@ -43,9 +44,9 @@ bool AMOREDAQManager::AddADC(AbsConfList * conflist)
       ERROR("AMOREADC[sid=%2d] enabled but not linked", conf->SID());
       return false;
     }
-    auto * adc = new AMOREADC(conf);
-    Add(adc);
+    auto adc = std::make_unique<AMOREADC>(conf);
     INFO("AMOREADC[sid=%2d] added to DAQ manager", adc->GetSID());
+    CupDAQManager::AddADC(std::move(adc));
   }
 
   return true;
@@ -241,7 +242,7 @@ void AMOREDAQManager::ReadConfigADC(YAML::Node ymlnode)
 
 bool AMOREDAQManager::PrepareDAQ()
 {
-  const int nadc = GetEntries();
+  const int nadc = GetNADC();
 
   if (nadc <= 0) {
     ERROR("No ADC module included in the configuration");
@@ -264,14 +265,14 @@ bool AMOREDAQManager::PrepareDAQ()
   int dsr = 0;
   int rl = 0;
   for (int i = 0; i < nadc; ++i) {
-    auto * adc = static_cast<AbsADC *>(fCont[i]);
+    auto * adc = fADCList[i].get();
     auto * conf = static_cast<AMOREADCConf *>(adc->GetConfig());
     dsr = conf->SR();
     rl = conf->RL();
   }
 
   // sorting ADCs with SID
-  Sort();
+  // Sort removed (using std::vector)
 
   fMinimumBCount = AMORE::kMINIMUMBCOUNT;
   fRecordLength = rl;
@@ -333,7 +334,7 @@ void AMOREDAQManager::ReadConfigDAQ(YAML::Node ymlnode)
 
 bool AMOREDAQManager::MeasurePedestal()
 {
-  const int    nadc       = GetEntries();
+  const int    nadc       = GetNADC();
   const int    nch        = AMORE::kNCHPERADC;
   const double kDuration  = 1.0;  // seconds of data to collect
   const int    kNIter     = 3;    // sigma-clipping iterations
@@ -368,7 +369,7 @@ bool AMOREDAQManager::MeasurePedestal()
         return false;
       }
 
-      auto * adc  = static_cast<AbsADC *>(fCont[i]);
+      auto * adc  = fADCList[i].get();
       auto * conf = static_cast<AMOREADCConf *>(adc->GetConfig());
 
       while (true) {
@@ -400,7 +401,7 @@ bool AMOREDAQManager::MeasurePedestal()
   report += Form("  (%.0f-sigma clipping, %d iterations)\n", kSigmaCut, kNIter);
 
   for (int i = 0; i < nadc; ++i) {
-    auto * adc = static_cast<AbsADC *>(fCont[i]);
+    auto * adc = fADCList[i].get();
 
     int baselines[nch];
 
@@ -472,7 +473,7 @@ bool AMOREDAQManager::MeasurePedestal()
 
   // clear ADC buffers so TF_ReadData starts from fresh data
   for (int i = 0; i < nadc; ++i)
-    static_cast<AbsADC *>(fCont[i])->Bclear();
+    fADCList[i].get()->Bclear();
 
   return true;
 }

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "AMORESystem/AMORETCB.hh"
-#include "DAQConfig/AbsConf.hh"
-#include "DAQSystem/AbsADC.hh"
+#include "AbsConf.hh"
+#include "AbsADC.hh"
 
 class AMOREADC : public AbsADC {
 public:

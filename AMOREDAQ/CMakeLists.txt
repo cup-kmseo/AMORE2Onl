@@ -6,21 +6,10 @@ file ( GLOB MODULE_HEADERS ${MODULE_NAME}/*.hh )
 file ( GLOB MODULE_SOURCES src/*.cc )
 
 # --- Collect include dirs for dictionary ---
-# IMPORTANT:
-# 1. Paths to CUPDAQ modules must now include the 'CUPDAQ/' prefix.
-# 2. HDF5 is now a REQUIRED dependency, so conditional checks are removed.
 set ( DICT_I_FLAGS
     -I${LIBUSB_INCLUDE_DIRS}
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/OnlConsts
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/Notice
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/OnlObjs
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/RawObjs
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQUtils
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQSystem
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQConfig
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQTrigger
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQ
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/HDF5Utils
+    -I${CUPDAQ_INCLUDE_DIR}
+    -I${CUPDATAMODEL_INCLUDE_DIR}
     -I${CMAKE_SOURCE_DIR}/AMORE
     -I${CMAKE_SOURCE_DIR}/AMORESystem
     -I${CMAKE_SOURCE_DIR}/AMOREAlgs
@@ -57,16 +46,16 @@ target_link_libraries ( ${MODULE_NAME}
     cppzmq
     ${ROOT_LIBRARIES}
     ${HDF5_LIBRARIES}
-    OnlConsts
-    Notice
-    OnlObjs
-    RawObjs
-    DAQUtils
-    DAQSystem
-    DAQConfig
-    DAQTrigger
-    DAQ
-    HDF5Utils
+    CUPDAQ::OnlConsts
+    CUPDAQ::Notice
+    CUPDAQ::OnlObjs
+    CUPDataModel::RawObjs
+    CUPDAQ::DAQUtils
+    CUPDAQ::DAQSystem
+    CUPDAQ::DAQConfig
+    CUPDAQ::DAQTrigger
+    CUPDAQ::DAQ
+    CUPDataModel::HDF5Utils
     AMORE
     AMORESystem
     AMOREAlgs

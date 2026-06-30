@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <vector>
 
+#include "Rtypes.h"
+
 #include "AMOREHDF5/AMOREEDM.hh"
-#include "HDF5Utils/AbsH5Hit.hh"
+#include "AbsH5Hit.hh"
 
 #include "hdf5.h"
 

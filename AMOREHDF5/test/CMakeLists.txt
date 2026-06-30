@@ -19,7 +19,7 @@ foreach ( src ${TEST_SOURCES} )
     # Therefore, explicit target_include_directories and repetitive linking are removed.
     target_link_libraries ( ${test_name}
         PRIVATE
-            HDF5Utils
+            CUPDataModel::HDF5Utils
             AMOREHDF5
     )
 

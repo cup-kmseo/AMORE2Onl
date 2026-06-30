@@ -7,7 +7,7 @@
 
 #include "hdf5.h"
 
-#include "DAQUtils/ELog.hh"
+#include "ELog.hh"
 #include "AMOREHDF5/H5AMOREStream.hh"
 #include "AMORESystem/AMOREADCConf.hh"
 #include "AMOREDAQ/AMOREDAQManager.hh"
@@ -32,12 +32,12 @@ static hid_t OpenStreamFile(const std::string & path, int compression)
 
 void AMOREDAQManager::TF_WriteStream_AMORE()
 {
-  if (!ThreadWait(fRunStatus, fDoExit)) {
+  if (!WaitRunState(fRunStatus, RUNSTATE::kRUNNING, fDoExit)) {
     WARNING("Exited by exit command before starting");
     return;
   }
 
-  const int nadc = GetEntries();
+  const int nadc = GetNADC();
   const int nch  = AMORE::kNCHPERADC;
 
   std::string first_file = fOutputFilename + ".00000";
@@ -52,7 +52,7 @@ void AMOREDAQManager::TF_WriteStream_AMORE()
 
   std::vector<std::unique_ptr<H5AMOREStream>> streams(nadc);
   for (int i = 0; i < nadc; ++i) {
-    auto * adc = static_cast<AbsADC *>(fCont[i]);
+    auto * adc = fADCList[i].get();
     streams[i] = std::make_unique<H5AMOREStream>();
     if (streams[i]->Open(fid, adc->GetSID(), nch, 4096, fCompressionLevel) < 0) {
       ERROR("H5AMOREStream::Open failed for SID %d", adc->GetSID());
@@ -90,7 +90,7 @@ void AMOREDAQManager::TF_WriteStream_AMORE()
       fSubRunNumber += 1;
       char newname[512];
       std::snprintf(newname, sizeof(newname), "%s.%05d",
-                    fOutputFilename.c_str(), fSubRunNumber);
+                    fOutputFilename.c_str(), fSubRunNumber.load());
       fid = OpenStreamFile(newname, fCompressionLevel);
       if (fid < 0) {
         ERROR("Cannot create split stream file: %s", newname);
@@ -101,7 +101,7 @@ void AMOREDAQManager::TF_WriteStream_AMORE()
       INFO("%s opened", newname);
 
       for (int i = 0; i < nadc; ++i) {
-        auto * adc = static_cast<AbsADC *>(fCont[i]);
+        auto * adc = fADCList[i].get();
         if (streams[i]->Open(fid, adc->GetSID(), nch, 4096, fCompressionLevel) < 0) {
           ERROR("H5AMOREStream::Open failed for SID %d after split", adc->GetSID());
           RUNSTATE::SetError(fRunStatus);
@@ -117,14 +117,14 @@ void AMOREDAQManager::TF_WriteStream_AMORE()
     if (fReadStatus == ENDED) {
       int remain = 0;
       for (int i = 0; i < nadc; ++i)
-        remain += static_cast<AbsADC *>(fCont[i])->Bsize();
+        remain += fADCList[i].get()->Bsize();
       if (remain == 0) break;
     }
 
     // --- Pop and write one chunk per ADC ---
     bool any_data = false;
     for (int i = 0; i < nadc; ++i) {
-      auto * adc  = static_cast<AbsADC *>(fCont[i]);
+      auto * adc  = fADCList[i].get();
       auto * conf = static_cast<AMOREADCConf *>(adc->GetConfig());
 
       auto chunk = adc->Bpop_front();

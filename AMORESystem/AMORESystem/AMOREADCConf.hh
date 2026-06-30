@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "AMORE/amoreconsts.hh"
-#include "DAQConfig/AbsConf.hh"
+#include "AbsConf.hh"
 
 class AMOREADCConf : public AbsConf {
 public:
@@ -29,6 +29,8 @@ public:
   void SetBWFLC(double val);
   void SetBWFUC(double val);
   void SetRVTmpltFile(const std::string & path);
+  void SetRVTmpltHistPfx(const std::string & pfx);
+  void SetRVTmpltHistPfxFR50(const std::string & pfx);
   void SetRVNWin(int val);
   void SetRVDS(int val);
   void SetRVTHRY(int ch, int val);  // ellipse RV²  axis: stored as (val*1e-3)²
@@ -53,6 +55,8 @@ public:
   double BWFLC() const;
   double BWFUC() const;
   const std::string & RVTmpltFile() const;
+  const std::string & RVTmpltHistPfx() const;
+  const std::string & RVTmpltHistPfxFR50() const;
   int    RVNWin() const;
   int    RVDS() const;
   double RVTHRY(int ch) const;  // 0 if not set (ellipse cut disabled)
@@ -79,6 +83,8 @@ private:
   double fBWFLC{0};
   double fBWFUC{0};
   std::string fRVTmpltFile{};
+  std::string fRVTmpltHistPfx{"htmp"};
+  std::string fRVTmpltHistPfxFR50{};  // if set, use this histogram prefix for fr50 computation
   int    fRVNWin{100};
   int    fRVDS{8};
   double fRVTHRY[AMORE::kNCHPERADC]{};  // ellipse RV²  axis threshold
@@ -141,6 +147,8 @@ inline void AMOREADCConf::SetBWFOrder(int val)              { fBWFOrder = val; }
 inline void AMOREADCConf::SetBWFLC(double val)              { fBWFLC = val; }
 inline void AMOREADCConf::SetBWFUC(double val)              { fBWFUC = val; }
 inline void AMOREADCConf::SetRVTmpltFile(const std::string & path) { fRVTmpltFile = path; }
+inline void AMOREADCConf::SetRVTmpltHistPfx(const std::string & pfx) { fRVTmpltHistPfx = pfx; }
+inline void AMOREADCConf::SetRVTmpltHistPfxFR50(const std::string & pfx) { fRVTmpltHistPfxFR50 = pfx; }
 inline void AMOREADCConf::SetRVNWin(int val)                { fRVNWin = val; }
 inline void AMOREADCConf::SetRVDS(int val)                  { fRVDS = val; }
 inline void AMOREADCConf::SetRVTHRY(int ch, int val)        { fRVTHRY[ch] = 1e-6 * val * val; }
@@ -151,6 +159,10 @@ inline int    AMOREADCConf::BWFOrder()      const { return fBWFOrder; }
 inline double AMOREADCConf::BWFLC()        const { return fBWFLC; }
 inline double AMOREADCConf::BWFUC()        const { return fBWFUC; }
 inline const std::string & AMOREADCConf::RVTmpltFile() const { return fRVTmpltFile; }
+inline const std::string & AMOREADCConf::RVTmpltHistPfx() const { return fRVTmpltHistPfx; }
+inline const std::string & AMOREADCConf::RVTmpltHistPfxFR50() const {
+  return fRVTmpltHistPfxFR50.empty() ? fRVTmpltHistPfx : fRVTmpltHistPfxFR50;
+}
 inline int    AMOREADCConf::RVNWin()       const { return fRVNWin; }
 inline int    AMOREADCConf::RVDS()         const { return fRVDS; }
 

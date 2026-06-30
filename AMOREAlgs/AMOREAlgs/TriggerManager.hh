@@ -8,7 +8,7 @@
 
 #include "AMOREAlgs/AbsSWTrigger.hh"
 #include "AMORESystem/AMOREADCConf.hh"
-#include "DAQConfig/AbsConfList.hh"
+#include "AbsConfList.hh"
 
 // Alias for a function that creates a specific trigger instance
 using TriggerCreator = std::function<std::unique_ptr<AbsSWTrigger>(const char *)>;

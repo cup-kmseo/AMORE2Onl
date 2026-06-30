@@ -6,15 +6,9 @@ file(GLOB MODULE_HEADERS ${MODULE_NAME}/*.hh)
 file(GLOB MODULE_SOURCES src/*.cc)
 
 # --- Collect include dirs for dictionary ---
-# IMPORTANT: Paths to CUPDAQ modules must now include the 'CUPDAQ/' prefix.
-# AMORE module is native to AMORE2Onl, so its path remains unchanged.
 set(DICT_I_FLAGS
     -I${LIBUSB_INCLUDE_DIRS}
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/OnlConsts
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/Notice
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQUtils
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQSystem
-    -I${CMAKE_SOURCE_DIR}/CUPDAQ/DAQConfig
+    -I${CUPDAQ_INCLUDE_DIR}
     -I${CMAKE_SOURCE_DIR}/AMORE
 )
 
@@ -43,11 +37,10 @@ target_include_directories(${MODULE_NAME}
 target_link_libraries(${MODULE_NAME}
     PUBLIC
     ${ROOT_LIBRARIES}
-    OnlConsts
-    Notice
-    DAQConfig
-    DAQSystem
-    DAQConfig
+    CUPDAQ::OnlConsts
+    CUPDAQ::Notice
+    CUPDAQ::DAQConfig
+    CUPDAQ::DAQSystem
     AMORE
 )
 

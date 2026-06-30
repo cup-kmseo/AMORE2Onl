@@ -5,8 +5,8 @@
 #include <vector>
 
 #include "AMOREHDF5/H5AMOREEvent.hh"
-#include "HDF5Utils/H5DataReader.hh"
-#include "HDF5Utils/H5DataWriter.hh"
+#include "H5DataReader.hh"
+#include "H5DataWriter.hh"
 
 // -----------------------------------------------------------------------------
 // Write function for AMORE Events

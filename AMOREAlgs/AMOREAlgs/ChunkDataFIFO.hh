@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "AMORESystem/AMOREADCConf.hh"
-#include "DAQUtils/ConcurrentDeque.hh"
+#include "ConcurrentDeque.hh"
 
 struct Chunk {
   std::vector<unsigned long> fTime;

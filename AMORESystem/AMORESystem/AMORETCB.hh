@@ -6,8 +6,8 @@
 
 #include "AMORESystem/AMORETCBConf.hh"
 #include "AMORESystem/AMOREADCConf.hh"
-#include "DAQConfig/AbsConfList.hh"
-#include "Notice/NKTCB.hh"
+#include "AbsConfList.hh"
+#include "NKTCB.hh"
 
 class AMORETCB : public TObject {
 public:

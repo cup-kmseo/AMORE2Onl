@@ -4,7 +4,7 @@
 #include "AMOREAlgs/AbsSWTrigger.hh"
 #include "AMOREAlgs/TriggerManager.hh"
 #include "AMORESystem/AMOREADCConf.hh"
-#include "DAQConfig/AbsConfList.hh"
+#include "AbsConfList.hh"
 
 int main()
 {

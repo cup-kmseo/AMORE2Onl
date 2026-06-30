@@ -8,8 +8,8 @@
 #include <map>
 #include <thread>
 
-#include "DAQUtils/ELog.hh"
-#include "DAQConfig/DAQConf.hh"
+#include "ELog.hh"
+#include "DAQConf.hh"
 
 #include "AMOREDAQ/AMOREDAQManager.hh"
 
@@ -317,7 +317,7 @@ void AMOREDAQManager::RC_AMOREDAQ()
     RUNSTATE::SetState(fRunStatus, RUNSTATE::kBOOTED);
 
     // wait for kCONFIGRUN from master
-    if (WaitCommand(fDoConfigRun, fDoExit) != 0) {
+    if (WaitCommand(fDoConfigRun, fDoExit, fRunStatus) != 0) {
       INFO("amoredaq [%s] exited before CONFIGRUN", fDAQName.c_str());
       fDoExit = true;
       th_msg.join();
@@ -369,7 +369,7 @@ void AMOREDAQManager::RC_AMOREDAQ()
     INFO("amoredaq [%s] configured", fDAQName.c_str());
 
     // wait for kSTARTRUN from master
-    if (WaitCommand(fDoStartRun, fDoExit) != 0) {
+    if (WaitCommand(fDoStartRun, fDoExit, fRunStatus) != 0) {
       INFO("amoredaq [%s] exited before STARTRUN", fDAQName.c_str());
       fDoExit = true;
       CloseDAQ(); fTCB.Close();
@@ -381,7 +381,7 @@ void AMOREDAQManager::RC_AMOREDAQ()
   // ----------------------------------------------------------
   // Start data threads (wait on kRUNNING via ThreadWait)
   // ----------------------------------------------------------
-  const int nadc = GetEntries();
+  const int nadc = GetNADC();
   th1 = std::thread(&AMOREDAQManager::TF_ReadData_AMORE, this);
   if (fContinuousMode) {
     th3 = std::thread(&AMOREDAQManager::TF_WriteStream_AMORE, this);
@@ -416,7 +416,7 @@ void AMOREDAQManager::RC_AMOREDAQ()
   // ----------------------------------------------------------
   if (isSlave) {
     // slave: wait for kENDRUN command from master
-    WaitCommand(fDoEndRun, fRunStatus);
+    WaitCommand(fDoEndRun, fDoExit, fRunStatus);
   }
   else {
     // standalone: time-based loop, print instantaneous trigger rate every 10 s
@@ -472,7 +472,7 @@ void AMOREDAQManager::RC_AMOREDAQ()
   if (isSlave) {
     RUNSTATE::SetState(fRunStatus, RUNSTATE::kPROCENDED);
     INFO("amoredaq [%s] process ended, waiting for EXIT command", fDAQName.c_str());
-    WaitCommand(fDoExit);
+    WaitCommand(fDoExit, fDoExit, fRunStatus);
     th_msg.join();
   }
 
@@ -485,9 +485,9 @@ void AMOREDAQManager::PrintDAQSummary()
   unsigned long totalReadDataSize;
   double liveTime;
 
-  const std::size_t nadc = GetEntries();
+  const std::size_t nadc = GetNADC();
   if (nadc > 0) {
-    auto * theADC = static_cast<AbsADC *>(fCont[0]);
+    auto * theADC = fADCList[0].get();
     totalReadDataSize = static_cast<unsigned long>(nadc * theADC->GetTotalBCount() * kKILOBYTES);
     liveTime = theADC->GetCurrentTime() / kDONESECOND;
   }

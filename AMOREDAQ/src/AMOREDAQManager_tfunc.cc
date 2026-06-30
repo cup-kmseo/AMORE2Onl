@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <thread>
 
-#include "DAQUtils/ELog.hh"
+#include "ELog.hh"
 
 #include "AMOREHDF5/AMOREEDM.hh"
 #include "AMOREDAQ/AMOREDAQManager.hh"
@@ -10,16 +10,16 @@ void AMOREDAQManager::TF_ReadData_AMORE()
 {
   fReadStatus = READY;
 
-  if (!ThreadWait(fRunStatus, fDoExit)) {
+  if (!WaitRunState(fRunStatus, RUNSTATE::kRUNNING, fDoExit)) {
     WARNING("Exited by exit command before starting");
     return;
   }
 
-  const int nadc = GetEntries();
+  const int nadc = GetNADC();
 
   INFO("Reading data from ADCs started.");
 
-  auto * adc0 = static_cast<AbsADC *>(fCont[0]);
+  auto * adc0 = fADCList[0].get();
   std::vector<int> currentBCounts(nadc);
 
   double sleepError = 0.0;
@@ -91,12 +91,12 @@ void AMOREDAQManager::TF_StreamData()
 {
   fStreamStatus = READY;
 
-  if (!ThreadWait(fRunStatus, fDoExit)) {
+  if (!WaitRunState(fRunStatus, RUNSTATE::kRUNNING, fDoExit)) {
     WARNING("Exited by exit command before starting");
     return;
   }
 
-  const int nadc = GetEntries();
+  const int nadc = GetNADC();
 
   double sleepError = 0.0;
   double sleepIntegral = 0.0;
@@ -111,7 +111,7 @@ void AMOREDAQManager::TF_StreamData()
     if (fReadStatus == ENDED) {
       int remain = 0;
       for (int i = 0; i < nadc; ++i) {
-        auto * adc = static_cast<AbsADC *>(fCont[i]);
+        auto * adc = fADCList[i].get();
         remain += adc->Bsize();
       }
       if (remain == 0) { break; }
@@ -119,7 +119,7 @@ void AMOREDAQManager::TF_StreamData()
 
     int nTotalChunkinADC = 0;
     for (int i = 0; i < nadc; ++i) {
-      auto * adc = static_cast<AbsADC *>(fCont[i]);
+      auto * adc = fADCList[i].get();
       auto * conf = static_cast<AMOREADCConf *>(adc->GetConfig());
 
       nTotalChunkinADC += adc->Bsize();
@@ -153,12 +153,12 @@ void AMOREDAQManager::TF_SWTrigger(int n)
 {
   fTrigStatus[n] = READY;
 
-  if (!ThreadWait(fRunStatus, fDoExit)) {
+  if (!WaitRunState(fRunStatus, RUNSTATE::kRUNNING, fDoExit)) {
     WARNING("Exited by exit command before starting");
     return;
   }
 
-  auto * adc  = static_cast<AbsADC *>(fCont[n]);
+  auto * adc  = fADCList[n].get();
   auto * conf = static_cast<AMOREADCConf *>(adc->GetConfig());
   const int ndp = conf->RL();
   const int nch = kNCHAMOREADC;

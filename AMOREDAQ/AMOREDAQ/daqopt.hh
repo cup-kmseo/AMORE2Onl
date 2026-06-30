@@ -3,7 +3,7 @@
 #include <getopt.h>
 #include <vector>
 
-#include "OnlConsts/adcconsts.hh"
+#include "adcconsts.hh"
 #include "AMOREDAQ/daqopt.hh"
 
 struct daqopt {

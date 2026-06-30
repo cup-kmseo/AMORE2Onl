@@ -2,7 +2,7 @@
 
 #include "AMOREDAQ/AMOREDAQManager.hh"
 #include "AMOREDAQ/daqopt.hh"
-#include "OnlConsts/onlconsts.hh"
+#include "onlconsts.hh"
 
 int main(int argc, char ** argv)
 {

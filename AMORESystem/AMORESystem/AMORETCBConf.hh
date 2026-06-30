@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DAQConfig/AbsConf.hh"
+#include "AbsConf.hh"
 
 class AMORETCBConf : public AbsConf {
 public:

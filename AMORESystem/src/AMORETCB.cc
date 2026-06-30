@@ -2,7 +2,7 @@
 #include <vector>
 
 #include "AMORESystem/AMORETCB.hh"
-#include "DAQUtils/ELog.hh"
+#include "ELog.hh"
 
 ClassImp(AMORETCB)
 
