@@ -18,3 +18,4 @@
 /*.sh
 /tools/data_rv/
 /tools/figures/
+__pycache__/
