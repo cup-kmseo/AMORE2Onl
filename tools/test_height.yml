@@ -1,4 +1,4 @@
-# Standalone single-DAQ config — HeightTrigger
+# Standalone single-DAQ config — height trigger (SignalTrigger, HT condition)
 #
 # Usage:  amoredaq -c test_height.yml -r <run#> -t <seconds>
 #
@@ -24,7 +24,7 @@ AMOREADC:
     CID: [1]          # Channel ID start — auto-increments from 1 to NCH
     PID: [1]          # Physical ID start — auto-increments (crystals 0-7)
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]  # Per-ch trigger enable; phonon=1, photon=0
-    THR: [50]         # Trigger threshold [ADC counts]
+    THR: [50]         # Pile-up counting threshold [ADC counts] (CountPulses); trigger THR is in TRGCOND
     DT: 6000          # Per-ADC deadtime [samples]  (10 Hz sq.wave: HIGH=50ms=5000smp @SR=10)
     SR: 10            # Down-sampling rate [us/sample] (base clock: 1 MHz)
     RL: 10000         # Record length [samples]
@@ -34,7 +34,9 @@ AMOREADC:
     SLOPE_LB: 200     # Pile-up slope look-back [samples]
     SLOPE_DT: 300     # Pile-up slope deadtime [samples]
     TRGMODE:
-      - HeightTrigger # Trigger on pulse height exceeding THR
+      - SignalTrigger   # single signal path; conditions below
+    TRGCOND:                  # HT = pulse height > THR above baseline (former HeightTrigger)
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [50] }   # per crystal (8/ADC)
 
   - SID: 2
     ENABLED: 1
@@ -52,7 +54,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [50] }
 
   - SID: 3
     ENABLED: 1
@@ -70,7 +74,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [50] }
 
   - SID: 4
     ENABLED: 1
@@ -88,7 +94,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [50] }
 
   - SID: 5
     ENABLED: 1
@@ -106,7 +114,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [50] }
 
   - SID: 6
     ENABLED: 1
@@ -124,7 +134,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [50] }
 
   - SID: 7
     ENABLED: 1
@@ -142,7 +154,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [50] }
 
   - SID: 8
     ENABLED: 1
@@ -160,4 +174,6 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [50] }

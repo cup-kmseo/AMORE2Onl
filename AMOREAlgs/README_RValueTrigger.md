@@ -1,8 +1,10 @@
-# RValueTrigger — R-value (Pearson Correlation) Software Trigger
+# R-value Trigger (RVH / RVL) — Pearson Correlation Software Trigger
 
 ## Overview
 
-`RValueTrigger` is a per-channel software trigger for the AMoRE online DAQ.
+The R-value trigger is a condition (`RVCondition`, type `RV`) of the single signal
+trigger path `SignalTrigger` in the AMoRE online DAQ; the algorithm itself lives in
+`RVCore` (one engine per crystal and condition, e.g. RVH on heat, RVL on light).
 It fires when the streaming ADC signal strongly resembles a pre-loaded reference
 pulse shape (template).  The resemblance is measured by the **Pearson correlation
 coefficient** (called **R-value** or **RV**), computed over a sliding window of
@@ -208,54 +210,64 @@ auto-vectorisable by the compiler).
 
 ## Configuration reference
 
-All parameters are set through `AMOREADCConf`:
+Per ADC in the yml (`AMOREADC`), the conditions of the signal path go in `TRGCOND`:
 
-| Parameter | Setter | Default | Description |
-|---|---|---|---|
-| `BWF_ORDER` | `SetBWFOrder(n)` | 2 | Butterworth filter order |
-| `BWF_LC` | `SetBWFLC(hz)` | — | Lower cutoff frequency [Hz] |
-| `BWF_UC` | `SetBWFUC(hz)` | — | Upper cutoff frequency [Hz] |
-| `RV_DS` | `SetRVDS(n)` | 8 | Downsampling factor |
-| `RV_NWIN` | `SetRVNWin(n)` | 100 | Window length [downsampled samples] |
-| `RV_TMPLT` | `SetRVTmpltFile(path)` | — | Path to ROOT template file |
-| `RV_TMPLT_PFX` | `SetRVTmpltHistPfx(s)` | `htmp` | Histogram name prefix |
-| `RV_TMPLT_PFX_FR50` | `SetRVTmpltHistPfxFR50(s)` | same as PFX | Histogram prefix for fr50 search |
-| `THR` | `SetTHR(ch, val)` | — | RV threshold × 1000 per channel |
-| `THR_RVY` | `SetRVTHRY(ch, val)` | 0 (off) | Ellipse RV axis: val × 1e-3 |
-| `THR_RVX` | `SetRVTHRX(ch, val)` | 0 (off) | Ellipse ARV axis: val × 1e-3 |
-| `DLY` | `SetDLY(n)` | — | Warmup [raw samples]; suppress triggers during filter settling |
-| `DT` | `SetDT(ch, n)` | — | Dead time [raw samples] per channel after a trigger |
+```yaml
+TRGMODE: [RandomTrigger, SignalTrigger]   # pedestal path + signal path
+RV_TMPLT: /path/T000576.root             # template file (ADC-wide)
+DLY: 13000                               # pre-trigger samples = RV warmup
+DT: [1000]                               # crystal dead time = phonon channel DT
+TRGCOND:
+  RVH: { TRGON: [1], THR: [940], THRY: [1], THRX: [1], BWF: [1, 150, 2000], NWIN: 200, DS: 8 }
+  RVL: { TRGON: [1], THR: [990], BWF: [2, 800, 2400], NWIN: 60, DS: 4 }
+```
+
+| Key (in `TRGCOND.<name>`) | Default | Description |
+|---|---|---|
+| `TRGON` | 0 | Per crystal (8 per ADC) enable |
+| `THR` | — | Per crystal RV threshold × 1000 |
+| `THRY` / `THRX` | 0 (off) | Per crystal ellipse axes, val × 1e-3 (cut RV²/THRY² + ARV²/THRX² > 1) |
+| `BWF` | `[2, 0, 0]` | Butterworth `[order, lc, uc]` [Hz] at the downsampled rate |
+| `NWIN` | 100 | Window length [downsampled samples] |
+| `DS` | 8 | Downsampling factor |
+| `TMPLT_PFX` | RVH `htmp`, RVL `ltmp` | Template histogram prefix (`<pfx><crystal id:02d>`) |
+| `FR50_PFX` | RVL `htmp` | Histogram used to find the 50% rise (template cut point) |
+
+Known names set `TYPE: RV`, the target channel and the trigger bit: RVH = heat
+(phonon, 2x), bit 0; RVL = light (photon, 2x+1), bit 2. The template is looked up
+by crystal id = `PID(phonon ch) / 2`. `SR` is [µs / sample]; the filters use
+`1e6 / SR` Hz.
 
 ---
 
 ## Class structure
 
 ```
-AbsSWTrigger          (AMOREAlgs/AbsSWTrigger.hh)
-│  - manages FIFO, channel enable/disable, dead time, baselines
-│  - calls PrepareAlgo() and EvalChannel() per subclass
+SignalTrigger         (AMOREAlgs/SignalTrigger.hh)   single signal path
+│  - FIFO, baselines, per-crystal dead time, trgbit OR, waveform snapshot
+│  - evaluates every condition on every sample
 │
-└── RValueTrigger     (AMOREAlgs/RValueTrigger.hh / src/RValueTrigger.cc)
-       - PrepareAlgo(): loads template, builds fTdev, initialises state
-       - EvalChannel(ch, adcVal):  uint16 input path
-       - EvalChannelD(ch, adcVal): double input path (matches read_amod.C precision)
-       - EvalImpl(ch, input):      shared computation core
-       - GetLastRV / GetLastARV:   values at the moment the last trigger fired
-       - GetCurrentRV / GetCurrentARV: most recent computed values (monitoring)
-       - GetRVPeak / GetARVPeak:   peak since the last trigger (monitoring)
+└── RVCondition       (AMOREAlgs/TrgCondition.hh)    type "RV" (RVH, RVL)
+       - PrepareAlgo(): loads templates (RVTemplateFile), one RVCore per crystal
+       - Eval(xtal, value) -> RVCore::Eval
+       - GetLastRV / GetLastARV(xtal): values when the last trigger fired
+
+RVCore                (AMOREAlgs/RVCore.hh / src/RVCore.cc)   ROOT-free engine
+       - Prepare(par, template, fr50): builds tdev, initialises state
+       - Eval(input): streaming filter, sliding correlation, local-max decision
+       - LastRV / LastARV, CurrentRV / CurrentARV, RVPeak / ARVPeak
 ```
 
-`ButterworthFilter` (`AMOREAlgs/ButterworthFilter.hh`) is embedded one-per-channel
-inside `RValueTrigger` and provides both a batch `Filter(n, in, out)` method
-(used during template preparation) and a streaming `Filter(x)` method (used
-per-sample in `EvalImpl`).
+`ButterworthFilter` (`AMOREAlgs/ButterworthFilter.hh`) is embedded in each `RVCore`
+and provides both a batch `Filter(n, in, out)` method (used during template
+preparation) and a streaming `Filter(x)` method (used per sample in `RVCore::Eval`).
 
 ---
 
 ## Warmup
 
-When `Prepare()` is first called, `fWarmupLeft[ch]` is set to `DLY` (raw
-samples).  Until the countdown reaches zero, `EvalImpl` processes samples normally
+When `Prepare()` is first called, `fWarmupLeft` is set to `DLY` (raw
+samples).  Until the countdown reaches zero, `RVCore::Eval` processes samples normally
 (advancing the filter state and filling the buffer) but does not fire triggers.
 This allows the IIR filter to settle and the sliding window to fill before any
 decision is made.
@@ -307,7 +319,7 @@ with the trigger point at sample `DLY` within each waveform.
 
 ## Per-sample cost (hot path)
 
-At `SR = 100 kHz` and `fDS = 8`, `EvalImpl` runs the full computation every
+At `SR = 100 kHz` and `fDS = 8`, `RVCore::Eval` runs the full computation every
 8 raw samples (12.5 kHz).  The dominant cost per call:
 
 | Operation | Notes |

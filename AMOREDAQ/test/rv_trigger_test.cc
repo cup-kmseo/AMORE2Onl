@@ -33,20 +33,64 @@
 #include "hdf5.h"
 
 #include "AMORE/amoreconsts.hh"
-#include "AMOREAlgs/RValueTrigger.hh"
+#include "AMOREAlgs/RVCore.hh"
+#include "AMOREAlgs/RVTemplate.hh"
 #include "AMOREAlgs/SignalTrigger.hh"
 #include "AMORESystem/AMOREADCConf.hh"
 
 // ---------------------------------------------------------------------------
-// Thin subclass: exposes protected EvalChannel for direct per-sample calls.
+// Legacy-mode driver: one RVCore per enabled channel of a board, set up from an
+// AMOREADCConf (TRGON, THR, RVTHRY/X, CID = template xid, BWF, RV_NWIN, RV_DS,
+// SR, DLY, template prefixes). Same engine RVCondition runs, but fed with float
+// input (raw * 0.25 - float baseline) to match read_amod.C bit for bit.
 // ---------------------------------------------------------------------------
-class RVTriggerDriver : public RValueTrigger {
+class RVTriggerDriver {
 public:
-  explicit RVTriggerDriver(const char * name) : RValueTrigger(name) {}
-  bool Eval(int ch, unsigned short v) { return EvalChannel(ch, v); }
-  bool EvalF(int ch, double v)        { return EvalChannelD(ch, v); }
-  double PeakRV(int ch)  const { return GetRVPeak(ch); }
-  double PeakARV(int ch) const { return GetARVPeak(ch); }
+  explicit RVTriggerDriver(const char * name) : fName(name) {}
+  void SetConfig(AMOREADCConf * c) { fConf = c; }
+
+  bool Prepare()
+  {
+    RVTemplateFile tf;
+    if (!tf.Open(fConf->RVTmpltFile())) { std::cerr << fName << ": " << tf.Error() << "\n"; return false; }
+    const std::string & pfx  = fConf->RVTmpltHistPfx();
+    const std::string & pfx50 = fConf->RVTmpltHistPfxFR50();
+    const bool useFR50 = pfx50 != pfx;
+
+    RVParams par;
+    par.bwfOrder = fConf->BWFOrder(); par.bwfLC = fConf->BWFLC(); par.bwfUC = fConf->BWFUC();
+    par.nwin = fConf->RVNWin(); par.ds = fConf->RVDS();
+    par.sr = fConf->SamplingFreqHz(); par.warmup = fConf->DLY();
+
+    for (int ch = 0; ch < AMORE::kNCHPERADC; ++ch) {
+      if (!fConf->TRGON(ch)) continue;
+      std::vector<double> tmpl, fr50;
+      const int xid = fConf->CID(ch);
+      if (!tf.Load(pfx, xid, tmpl) || (useFR50 && !tf.Load(pfx50, xid, fr50))) {
+        std::cerr << fName << " ch" << ch << ": " << tf.Error() << "\n"; return false;
+      }
+      par.thr = fConf->THR(ch) * 1e-3; par.thry = fConf->RVTHRY(ch); par.thrx = fConf->RVTHRX(ch);
+      std::string err;
+      if (!fCore[ch].Prepare(par, tmpl, useFR50 ? &fr50 : nullptr, err)) {
+        std::cerr << fName << " ch" << ch << ": " << err << "\n"; return false;
+      }
+    }
+    return true;
+  }
+
+  void SetBaselinesD(const double * v, int nch)
+  {
+    for (int i = 0; i < nch && i < AMORE::kNCHPERADC; ++i) fBase[i] = v[i];
+  }
+  bool   EvalF(int ch, double v)     { return fCore[ch].Eval(v - fBase[ch]); }
+  double GetLastRV(int ch)  const    { return fCore[ch].LastRV(); }
+  double GetLastARV(int ch) const    { return fCore[ch].LastARV(); }
+
+private:
+  std::string    fName;
+  AMOREADCConf * fConf{nullptr};
+  RVCore         fCore[AMORE::kNCHPERADC];
+  double         fBase[AMORE::kNCHPERADC]{};
 };
 
 // ---------------------------------------------------------------------------

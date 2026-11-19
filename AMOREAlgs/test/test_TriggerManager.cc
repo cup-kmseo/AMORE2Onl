@@ -27,7 +27,7 @@ int main()
   conf0.SetLink();
 
   AMOREADCConf conf1(2);
-  conf1.SetTRGMODE("RValueTrigger");
+  conf1.SetTRGMODE("SignalTrigger");
   conf1.SetEnable();
   conf1.SetLink();
 

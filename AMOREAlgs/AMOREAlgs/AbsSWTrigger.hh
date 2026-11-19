@@ -40,22 +40,17 @@ public:
   bool IsFIFOEmpty() const;
   void SetBaselines(const int * vals, int nch);
 
-  // Count distinct pulses in a single-channel waveform using the same
-  // baseline and threshold already configured for this trigger.
+  // Count distinct pulses in a single-channel waveform using the channel's
+  // THR / SLOPE_LB / SLOPE_DT settings and baseline.
   // Returns >= 1 (the triggering pulse itself); >= 2 means pile-up.
   int CountPulses(int ch, const std::uint16_t * wave, int ndp) const;
 
-  // Common per-channel self-trigger framework.
-  // Subclasses implement PrepareAlgo() and EvalChannel() only.
+  // Sets up the FIFO, per-channel settings and snapshot buffers, then PrepareAlgo().
   bool Prepare();
-  int DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned short ** adcval,
-                unsigned long * timetag = nullptr);
 
-  // Unified output used by TF_SWTrigger: append finalised crystal triggers.
-  // Returns the number appended (> 0), 0 when more data is needed, -1 on FIFO
-  // error / stop. The default adapts the per-channel DoTrigger() of the legacy
-  // triggers (one record per fired phonon channel, trgbit 0).
-  virtual int DoTriggerXtal(std::vector<XtalTrigger> & out);
+  // Append finalised crystal triggers. Returns the number appended (> 0),
+  // 0 when more data is needed, -1 on FIFO error / stop.
+  virtual int DoTriggerXtal(std::vector<XtalTrigger> & out) = 0;
 
   // End of run: emit crystals still held back (e.g. inside their dead time).
   virtual void FlushPending(std::vector<XtalTrigger> & /*out*/) {}
@@ -67,10 +62,6 @@ protected:
   // Override in subclasses to perform algorithm-specific initialisation.
   // Called by Prepare() after InitFIFO() and InitChannels().
   virtual bool PrepareAlgo() { return true; }
-
-  // Per-channel trigger decision for a single time-bin sample.
-  // Return true to fire a trigger on this channel.
-  virtual bool EvalChannel(int ch, unsigned short adcVal) = 0;
 
   void InitFIFO();
   void InitChannels();
@@ -95,11 +86,9 @@ protected:
 
   std::mutex fMutex;
 
-  // Per-channel self-trigger state (populated by InitChannels)
-  int fTrgOn[AMORE::kNCHPERADC]{};
-  int fTHR[AMORE::kNCHPERADC]{};
-  int fDeadtime[AMORE::kNCHPERADC]{};
-  int fDeadtimeCounter[AMORE::kNCHPERADC]{};
+  // Per-channel settings (populated by InitChannels)
+  int fTHR[AMORE::kNCHPERADC]{};       // pile-up counting threshold (CountPulses)
+  int fDeadtime[AMORE::kNCHPERADC]{};  // DT; SignalTrigger uses the phonon channel's as crystal DT
   int fBaseline[AMORE::kNCHPERADC]{};
   int fSlopeLookBack[AMORE::kNCHPERADC]{};  // pile-up slope look-back window per channel
   int fSlopeDeadtime[AMORE::kNCHPERADC]{};  // pile-up slope deadtime per channel

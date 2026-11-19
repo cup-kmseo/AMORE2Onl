@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-plot_rv_correlation.py — waveform + R-value(correlation) overlay for RValueTrigger
+plot_rv_correlation.py — waveform + R-value(correlation) overlay for the R-value trigger (RVCore)
 
-RValueTrigger.cc의 PrepareAlgo()/EvalImpl() 알고리즘을 파이썬으로 재현하여,
+RVCore.cc의 Prepare()/Eval() 알고리즘을 파이썬으로 재현하여,
 트리거된 waveform 위(상단)에 실제 ADC 파형을, 아래(하단)에 그 순간의
 R-value(템플릿과의 슬라이딩 Pearson correlation) 궤적을 함께 그린다.
 
 발표/설명용 그림이며, C++ 스트리밍 알고리즘의 근사 재현이다:
   - Butterworth 대역통과 필터는 scipy.signal.butter+lfilter (causal)로 대체
-    (RValueTrigger.cc의 자체 IIR 설계와 동일한 표준 Butterworth 대역통과이므로
+    (RVCore가 쓰는 ButterworthFilter의 자체 IIR 설계와 동일한 표준 Butterworth 대역통과이므로
      주파수 응답은 사실상 동일하지만, 계수가 bit-exact는 아니다)
   - 나머지 (다운샘플링, 슬라이딩 윈도우 Pearson correlation, fr50 템플릿 추출)는
-    RValueTrigger.cc / read_amod.C 로직을 그대로 따른다.
+    RVCore.cc / read_amod.C 로직을 그대로 따른다.
 
 Usage:
     plot_rv_correlation.py <run.config> <template.root> <wvf.h5> --xid N [options]
@@ -86,7 +86,7 @@ def causal_bandpass(x, order, lc, uc, fs):
 
 
 def build_template(tmpl_file, xid, pfx, order, lc, uc, sr, ds, nwin):
-    """RValueTrigger::PrepareAlgo()의 템플릿 추출을 재현.
+    """RVCore::Prepare()의 템플릿 추출을 재현.
 
     1) 원본 히스토그램(0.25배 스케일)에서 1000-3000 Hz BWF(order=2)로 피크를 찾고
        50% rise(fr50) 지점을 구한다.
@@ -214,7 +214,7 @@ def main():
         ax1.set_ylabel("ADC $-$ baseline\n[ADC counts]", fontsize=13)
         ax1b.set_ylabel("filtered signal / template\n(z-score)", fontsize=11)
         ax1b.set_ylim(-4, 4)
-        ax1.set_title(f"RValueTrigger — waveform & R-value ({key}, order={order}, "
+        ax1.set_title(f"R-value trigger — waveform & R-value ({key}, order={order}, "
                       f"BW=[{lc:.0f},{uc:.0f}] Hz, N$_{{win}}$={nwin})", fontsize=13)
         h1, l1 = ax1.get_legend_handles_labels()
         h1b, l1b = ax1b.get_legend_handles_labels()

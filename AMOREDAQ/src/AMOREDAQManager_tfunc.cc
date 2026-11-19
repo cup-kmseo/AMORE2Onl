@@ -197,9 +197,7 @@ void AMOREDAQManager::TF_SWTrigger(int n)
         continue;
       }
 
-      // Signal path: trgbit from its conditions. Legacy per-channel paths (removed
-      // later) keep the old "bit t = path t" marking.
-      xtal->trgbit = rec.trgbit ? rec.trgbit : (1u << t);
+      xtal->trgbit = rec.trgbit;  // fired conditions | opening condition(s) << 8
       fTriggeredCrystals.push_back(*xtal);
 
       std::lock_guard<std::mutex> lock(fMonitorMutex);

@@ -1,4 +1,4 @@
-# AMORE2Onl unified config — HeightTrigger (production)
+# AMORE2Onl unified config — height trigger (SignalTrigger, HT condition) (production)
 #
 # System:
 #   daq1 (DAQID=1): SID  1- 8 (8 ADCs, 128 ch, 64 crystals)
@@ -66,14 +66,16 @@ AMOREADC:
     CID: [1]          # Channel ID start — auto-increments from 1 to NCH
     PID: [1]          # Physical ID start — auto-increments (crystals 0-7)
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]  # Per-ch trigger enable; phonon=1, photon=0
-    THR: [20]         # Trigger threshold [ADC counts]
+    THR: [20]         # Pile-up counting threshold [ADC counts] (CountPulses); trigger THR is in TRGCOND
     SR: 10            # Down-sampling rate [us/sample] (base clock: 1 MHz)
     RL: 30000         # Record length [samples]
     DLY: 5000         # Pre-trigger delay [samples]
     ZSU: 1            # Zero suppression (1=on, 0=off)
     PTRG: 1000        # Pedestal trigger rate [uHz]  (1000 uHz = 1 mHz = 0.001 Hz)
     TRGMODE:
-      - HeightTrigger # Trigger on pulse height exceeding THR
+      - SignalTrigger   # single signal path; conditions below
+    TRGCOND:                  # HT = pulse height > THR above baseline (former HeightTrigger)
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }   # per crystal (8/ADC)
 
   - SID: 2
     ENABLED: 1
@@ -89,7 +91,9 @@ AMOREADC:
     ZSU: 1
     PTRG: 1000
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 3
     ENABLED: 1
@@ -105,7 +109,9 @@ AMOREADC:
     ZSU: 1
     PTRG: 1000
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 4
     ENABLED: 1
@@ -121,7 +127,9 @@ AMOREADC:
     ZSU: 1
     PTRG: 1000
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 5
     ENABLED: 1
@@ -137,7 +145,9 @@ AMOREADC:
     ZSU: 1
     PTRG: 1000
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 6
     ENABLED: 1
@@ -153,7 +163,9 @@ AMOREADC:
     ZSU: 1
     PTRG: 1000
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 7
     ENABLED: 1
@@ -169,7 +181,9 @@ AMOREADC:
     ZSU: 1
     PTRG: 1000
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 8
     ENABLED: 1
@@ -185,7 +199,9 @@ AMOREADC:
     ZSU: 1
     PTRG: 1000
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   # ================================================================
   # daq2 (DAQID: 2) — SID 9-12
@@ -205,7 +221,9 @@ AMOREADC:
     ZSU: 1
     PTRG: 1000
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 10
     ENABLED: 1
@@ -221,7 +239,9 @@ AMOREADC:
     ZSU: 1
     PTRG: 1000
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 11
     ENABLED: 1
@@ -237,7 +257,9 @@ AMOREADC:
     ZSU: 1
     PTRG: 1000
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 12
     ENABLED: 1
@@ -253,4 +275,6 @@ AMOREADC:
     ZSU: 1
     PTRG: 1000
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }

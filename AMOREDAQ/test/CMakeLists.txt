@@ -31,7 +31,7 @@ foreach ( src ${TEST_SOURCES} )
     )
 endforeach ()
 
-# --- RValueTrigger offline replay test (requires HDF5) ---
+# --- R-value trigger offline replay test (requires HDF5) ---
 if ( CUPDAQ_ENABLE_HDF5 )
     add_executable ( rv_trigger_test rv_trigger_test.cc )
 

@@ -1,33 +1,15 @@
 #include <iostream>
 
-#include "AMOREAlgs/ButterworthTrigger.hh"
-#include "AMOREAlgs/FallingEdgeTrigger.hh"
-#include "AMOREAlgs/HeightTrigger.hh"
-#include "AMOREAlgs/RValueTrigger.hh"
 #include "AMOREAlgs/RandomTrigger.hh"
-#include "AMOREAlgs/RisingEdgeTrigger.hh"
 #include "AMOREAlgs/SignalTrigger.hh"
 #include "AMOREAlgs/TriggerManager.hh"
 
+// Two path types: the pedestal path and the single signal path
+// (whose trigger conditions come from the ADC's TRGCOND block).
 TriggerManager::TriggerManager()
 {
   RegisterTriggerType("RandomTrigger",
                       [](const char * name) { return std::make_unique<RandomTrigger>(name); });
-
-  RegisterTriggerType("ButterworthTrigger",
-                      [](const char * name) { return std::make_unique<ButterworthTrigger>(name); });
-
-  RegisterTriggerType("RValueTrigger",
-                      [](const char * name) { return std::make_unique<RValueTrigger>(name); });
-
-  RegisterTriggerType("HeightTrigger",
-                      [](const char * name) { return std::make_unique<HeightTrigger>(name); });
-
-  RegisterTriggerType("RisingEdgeTrigger",
-                      [](const char * name) { return std::make_unique<RisingEdgeTrigger>(name); });
-
-  RegisterTriggerType("FallingEdgeTrigger",
-                      [](const char * name) { return std::make_unique<FallingEdgeTrigger>(name); });
 
   RegisterTriggerType("SignalTrigger",
                       [](const char * name) { return std::make_unique<SignalTrigger>(name); });

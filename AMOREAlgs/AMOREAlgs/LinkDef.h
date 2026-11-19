@@ -7,10 +7,6 @@
 #pragma link C++ class ChunkDataFIFO + ;
 #pragma link C++ class AbsSWTrigger + ;
 #pragma link C++ class RandomTrigger + ;
-#pragma link C++ class ButterworthTrigger + ;
-#pragma link C++ class RValueTrigger + ;
-#pragma link C++ class HeightTrigger + ;
-#pragma link C++ class RisingEdgeTrigger + ;
-#pragma link C++ class FallingEdgeTrigger + ;
+#pragma link C++ class SignalTrigger + ;
 
 #endif

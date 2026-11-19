@@ -245,12 +245,13 @@ void AMOREDAQManager::ReadConfigADC(YAML::Node ymlnode)
 
 // TRGCOND: signal-path trigger conditions (SignalTrigger), one map entry per condition.
 //   TRGCOND:
-//     RVH: { ON: [..], THR: [..], THRY: [..], THRX: [..],
+//     RVH: { TRGON: [..], THR: [..], THRY: [..], THRX: [..],
 //            BWF: [order, lc, uc], NWIN: n, DS: n, TMPLT_PFX: htmp, FR50_PFX: htmp }
-// Per-crystal arrays (ON/THR/THRY/THRX) have one value per crystal slot of the ADC
+// Per-crystal arrays (TRGON/THR/THRY/THRX) have one value per crystal slot of the ADC
 // (NCH/2); a shorter list repeats its last value. Known names set TYPE / TARGET / BIT:
 //   RVH = RV on heat, bit 0;  AMH = AM on heat, bit 1;  RVL = RV on light, bit 2
-// Any other name must give TYPE, TARGET (HEAT|LIGHT) and BIT (n of 1<<n, 0-7).
+// Any other name must give TYPE (RV|HT|RE|FE|BW), TARGET (HEAT|LIGHT) and BIT (n of 1<<n, 0-7).
+// ("ON" is avoided as a key: YAML 1.1 readers such as PyYAML turn it into a boolean.)
 void AMOREDAQManager::ReadConfigTrgCond(YAML::Node tnode, AMOREADCConf * conf)
 {
   if (!tnode.IsMap()) {
@@ -290,7 +291,7 @@ void AMOREDAQManager::ReadConfigTrgCond(YAML::Node tnode, AMOREADCConf * conf)
     }
     cc.bit = 1u << bitn;
 
-    FillConfigArray<int>(c["ON"],   nxtal, [&](int i, int v) { cc.on[i]   = v; });
+    FillConfigArray<int>(c["TRGON"], nxtal, [&](int i, int v) { cc.on[i]   = v; });
     FillConfigArray<int>(c["THR"],  nxtal, [&](int i, int v) { cc.thr[i]  = v; });
     FillConfigArray<int>(c["THRY"], nxtal, [&](int i, int v) { cc.thry[i] = v; });
     FillConfigArray<int>(c["THRX"], nxtal, [&](int i, int v) { cc.thrx[i] = v; });

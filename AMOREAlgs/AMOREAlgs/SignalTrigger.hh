@@ -42,8 +42,6 @@ public:
 protected:
   bool PrepareAlgo() override;
 
-  // Unused: conditions are evaluated per crystal in DoTriggerXtal().
-  bool EvalChannel(int, unsigned short) override { return false; }
 
 private:
   struct XtalState {

@@ -22,10 +22,8 @@ void AbsSWTrigger::InitFIFO()
 void AbsSWTrigger::InitChannels()
 {
   for (int ch = 0; ch < AMORE::kNCHPERADC; ++ch) {
-    fTrgOn[ch]           = fConfig->TRGON(ch);
     fTHR[ch]             = fConfig->THR(ch);
     fDeadtime[ch]        = fConfig->DT(ch);
-    fDeadtimeCounter[ch] = 0;
     fSlopeLookBack[ch]   = fConfig->SlopeLookBack(ch);
     fSlopeDeadtime[ch]   = fConfig->SlopeDeadtime(ch);
   }
@@ -55,80 +53,6 @@ bool AbsSWTrigger::Prepare()
   fDumpTime.assign(rl, 0);
 
   return PrepareAlgo();
-}
-
-int AbsSWTrigger::DoTriggerXtal(std::vector<XtalTrigger> & out)
-{
-  unsigned long trgtime = 0;
-  bool chbit[AMORE::kNCHPERADC]{};
-
-  const int ret = DoTrigger(trgtime, chbit, fDumpADC.data(), fDumpTime.data());
-  if (ret != 1) return ret;
-
-  const int rl = fConfig->RL();
-  int n = 0;
-  for (int x = 0; x < AMORE::kNXTALPERADC; ++x) {
-    if (!chbit[2 * x]) continue;  // legacy: only phonon channels open a crystal
-    XtalTrigger rec;
-    rec.xtal  = x;
-    rec.ttime = trgtime;
-    rec.phonon.assign(fDumpADC[2 * x],     fDumpADC[2 * x] + rl);
-    rec.photon.assign(fDumpADC[2 * x + 1], fDumpADC[2 * x + 1] + rl);
-    out.push_back(std::move(rec));
-    ++n;
-  }
-  return n;
-}
-
-int AbsSWTrigger::DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned short ** adcval,
-                             unsigned long * timetag)
-{
-  if (!fFIFO) return -1;
-
-  const int nch = AMORE::kNCHPERADC;
-  unsigned short binADC[nch];
-  unsigned long binTime = 0;
-
-  while (true) {
-    int pop = fFIFO->PopCurrent(binADC, binTime);
-
-    if (pop == 1) return 0; // wait for more data
-    if (pop < 0) return -1; // FIFO error
-
-    bool fired = false;
-
-    if (trgbit) {
-      for (int ch = 0; ch < nch; ++ch) trgbit[ch] = false;
-    }
-
-    for (int ch = 0; ch < nch; ++ch) {
-      if (!fTrgOn[ch]) continue;
-
-      // Always evaluate so stateful algorithms (IIR filters, sliding windows,
-      // previous-sample tracking) keep their state current through dead time,
-      // matching read_amod.C. Only the trigger decision is suppressed.
-      const bool chFired = EvalChannel(ch, binADC[ch]);
-
-      if (fDeadtimeCounter[ch] > 0) {
-        --fDeadtimeCounter[ch];
-        continue;
-      }
-
-      if (chFired) {
-        fired = true;
-        fDeadtimeCounter[ch] = fDeadtime[ch];
-        if (trgbit) trgbit[ch] = true;
-      }
-    }
-
-    if (fired) {
-      trgtime = binTime;
-      int copied = fFIFO->DumpCurrent(adcval, timetag);
-      if (copied > 0) return 1;
-    }
-  }
-
-  return 0;
 }
 
 void AbsSWTrigger::PushChunkData(unsigned char * data, int ndp)

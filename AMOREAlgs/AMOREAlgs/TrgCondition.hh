@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "AMOREAlgs/ButterworthFilter.hh"
 #include "AMOREAlgs/RVCore.hh"
 #include "AMORE/amoreconsts.hh"
 #include "AMORESystem/TrgCondConf.hh"
@@ -58,5 +59,53 @@ private:
   RVCore fCore[AMORE::kNXTALPERADC];
 };
 
-// Factory by TrgCondConf::type. Returns nullptr for an unknown type.
+// HT: level — fires while value > THR (ADC counts above baseline). With the crystal
+// dead time this triggers on the first sample above threshold.
+class HTCondition : public AbsTrgCondition {
+public:
+  bool Eval(int xtal, double value) override { return value > fCC.thr[xtal]; }
+
+protected:
+  bool PrepareAlgo() override { return true; }
+};
+
+// RE: rising edge — value crosses THR upward.
+class RECondition : public AbsTrgCondition {
+public:
+  bool Eval(int xtal, double value) override;
+
+protected:
+  bool PrepareAlgo() override;
+
+private:
+  double fPrev[AMORE::kNXTALPERADC]{};
+};
+
+// FE: falling edge — value crosses THR downward.
+class FECondition : public AbsTrgCondition {
+public:
+  bool Eval(int xtal, double value) override;
+
+protected:
+  bool PrepareAlgo() override;
+
+private:
+  double fPrev[AMORE::kNXTALPERADC]{};
+};
+
+// BW: Butterworth band-pass (BWF order/lc/uc at the raw sampling rate),
+// fires while the filtered value > THR.
+class BWCondition : public AbsTrgCondition {
+public:
+  bool Eval(int xtal, double value) override { return fFilter[xtal].Filter(value) > fCC.thr[xtal]; }
+
+protected:
+  bool PrepareAlgo() override;
+
+private:
+  ButterworthFilter fFilter[AMORE::kNXTALPERADC];
+};
+
+// Factory by TrgCondConf::type ("RV", "HT", "RE", "FE", "BW").
+// Returns nullptr for an unknown type.
 std::unique_ptr<AbsTrgCondition> MakeTrgCondition(const std::string & type);

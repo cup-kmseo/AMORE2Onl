@@ -25,7 +25,6 @@ public:
 
 protected:
   bool PrepareAlgo() override;
-  bool EvalChannel(int, unsigned short) override { return false; }  // unused
 
 private:
   std::uint64_t fThreshold{0};   // fire when hash(bin) < fThreshold  (= p * 2^64)

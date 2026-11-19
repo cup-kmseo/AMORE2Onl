@@ -48,7 +48,7 @@ AMOREADC:
     CID: [1]          # Channel ID start — auto-increments from 1 to NCH
     PID: [1]          # Physical ID start — auto-increments (crystals 0-7)
     TRGON: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]  # ignored in continuous mode
-    THR: [20]         # ignored in continuous mode
+    THR: [20]         # Pile-up counting threshold [ADC counts] (CountPulses); trigger THR is in TRGCOND
     SR: 10            # Down-sampling rate [us/sample] (base clock: 1 MHz)
     RL: 30000         # Record length [samples]
     DLY: 5000         # ignored in continuous mode
@@ -57,7 +57,9 @@ AMOREADC:
     SLOPE_LB: 200     # ignored in continuous mode
     SLOPE_DT: 300     # ignored in continuous mode
     TRGMODE:
-      - HeightTrigger # ignored in continuous mode
+      - SignalTrigger   # single signal path; conditions below
+    TRGCOND:                  # HT = pulse height > THR above baseline (former HeightTrigger)
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }   # per crystal (8/ADC)
 
   - SID: 2
     ENABLED: 1
@@ -75,7 +77,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 3
     ENABLED: 1
@@ -93,7 +97,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 4
     ENABLED: 1
@@ -111,7 +117,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 5
     ENABLED: 1
@@ -129,7 +137,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 6
     ENABLED: 1
@@ -147,7 +157,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 7
     ENABLED: 1
@@ -165,7 +177,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 8
     ENABLED: 1
@@ -183,7 +197,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   # ================================================================
   # daq2 (DAQID: 2) — SID 9-12
@@ -205,7 +221,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 10
     ENABLED: 1
@@ -223,7 +241,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 11
     ENABLED: 1
@@ -241,7 +261,9 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }
 
   - SID: 12
     ENABLED: 1
@@ -259,4 +281,6 @@ AMOREADC:
     SLOPE_LB: 200
     SLOPE_DT: 300
     TRGMODE:
-      - HeightTrigger
+      - SignalTrigger
+    TRGCOND:
+      HTH: { TYPE: HT, TARGET: HEAT, BIT: 3, TRGON: [1], THR: [20] }

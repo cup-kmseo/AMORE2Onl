@@ -4,7 +4,7 @@
 
 // Bandpass Butterworth IIR filter — ROOT-free.
 // Supports both batch processing (for template preparation) and
-// sample-by-sample streaming (for online trigger in EvalChannel).
+// sample-by-sample streaming (for online trigger conditions).
 class ButterworthFilter {
 public:
   ButterworthFilter() = default;
