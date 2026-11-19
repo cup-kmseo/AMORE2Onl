@@ -1,6 +1,5 @@
 #pragma once
 
-#include <deque>
 #include <vector>
 
 #include "AMOREAlgs/AbsSWTrigger.hh"
@@ -36,27 +35,49 @@ public:
   double GetCurrentRV(int ch)  const { return fRVPrev[ch]; }
   double GetCurrentARV(int ch) const { return fARVPrev[ch]; }
 
+  // Float-precision baseline (for high-precision input path via EvalChannelD).
+  // Set via SetBaselinesD(); defaults to 0.0 (no subtraction).
+  void SetBaselinesD(const double * vals, int nch) {
+    for (int i = 0; i < nch && i < AMORE::kNCHPERADC; ++i) fBaselineD[i] = vals[i];
+  }
+
 protected:
   bool PrepareAlgo() override;
   bool EvalChannel(int ch, unsigned short adcVal) override;
 
+  // Float-precision variant of EvalChannel — accepts a pre-scaled double ADC value
+  // (e.g. raw_uint32 * 0.25) and subtracts fBaselineD[ch].  Used by test harnesses
+  // that need to match the precision of read_amod.C (which uses 0.25× float multiply).
+  bool EvalChannelD(int ch, double adcVal);
+
 private:
+  // Shared computation core — adcVal already has baseline subtracted.
+  bool EvalImpl(int ch, double filterInput);
+
+  // Per-channel float baseline used by EvalChannelD.
+  double fBaselineD[AMORE::kNCHPERADC]{};
+
   // Per-channel Butterworth filter (streaming, at decimated rate SR/fDS)
   ButterworthFilter fFilter[AMORE::kNCHPERADC];
 
   int fNWin{100};
   int fDS{8};
 
-  // Template statistics computed in PrepareAlgo
-  std::vector<double> fTdev[AMORE::kNCHPERADC];  // template deviation from mean
+  // Template statistics computed in PrepareAlgo.
+  // fTdev is stored reversed: fTdev[ch][k] = (hftmp[fNWin-1-k] - mean),
+  // so the cross-correlation in EvalImpl is a forward-sequential dot product.
+  std::vector<double> fTdev[AMORE::kNCHPERADC];
   double fTstd[AMORE::kNCHPERADC]{};             // template std
 
   // Warmup countdown [raw samples]: mirrors "nprocessed >= fDELAY" in read_amod.C.
   // Trigger decisions are suppressed until the countdown reaches zero.
   int fWarmupLeft[AMORE::kNCHPERADC]{};
 
-  // Streaming state per channel
-  std::deque<double> fFiltBuf[AMORE::kNCHPERADC]; // filtered sample buffer (newest at [0])
+  // Streaming state per channel.
+  // fFiltBuf is a circular buffer; fBufHead[ch] is the index of the newest sample.
+  // k-th newest = fFiltBuf[ch][(fBufHead[ch] + k) % fNWin] (k=0 newest).
+  std::vector<double> fFiltBuf[AMORE::kNCHPERADC];
+  int    fBufHead[AMORE::kNCHPERADC]{};
   double fRunSum[AMORE::kNCHPERADC]{};
   double fRunSum2[AMORE::kNCHPERADC]{};
   int    fDSCounter[AMORE::kNCHPERADC]{};

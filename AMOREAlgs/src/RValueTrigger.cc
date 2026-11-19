@@ -51,45 +51,67 @@ bool RValueTrigger::PrepareAlgo()
     fFilter[ch].CreateFilter(order, lc, uc, sfDS);
 
     int xid = fConfig->CID(ch);
-    auto * hh = (TH1D *)ftmplt->Get(Form("htmp%02d", xid));
+    const std::string & pfx    = fConfig->RVTmpltHistPfx();
+    const std::string & pfxFR50 = fConfig->RVTmpltHistPfxFR50();
+    auto * hh = (TH1D *)ftmplt->Get(Form("%s%02d", pfx.c_str(), xid));
     if (!hh) {
       std::cerr << "[RValueTrigger] ch" << ch
-                << ": histogram htmp" << Form("%02d", xid) << " not found" << std::endl;
+                << ": histogram " << pfx << Form("%02d", xid) << " not found" << std::endl;
       ftmplt->Close();
       return false;
     }
 
     int nbins = hh->GetNbinsX();
-    int nds   = nbins / fDS;
 
-    // Downsample template from histogram (0.25 converts 14-bit range)
-    std::vector<double> h0ds(nds);
-    for (int i = 0; i < nds; ++i)
-      h0ds[i] = 0.25 * hh->GetBinContent(i * fDS + 1);
+    // Build full-rate histogram array (0.25 converts 32-bit ADC to 14-bit range)
+    std::vector<double> h0full(nbins);
+    for (int i = 0; i < nbins; ++i)
+      h0full[i] = 0.25 * hh->GetBinContent(i + 1);
 
-    // Apply batch filter to full downsampled template — used to locate the rise point
-    std::vector<double> hfds(nds);
-    fFilter[ch].Filter(nds, h0ds.data(), hfds.data());
+    // Locate the 50% rise: use pfxFR50 histogram if different from pfx (e.g. light
+    // template uses heat histogram for fr50 to match read_amod.C behaviour).
+    ButterworthFilter peakFinder;
+    peakFinder.CreateFilter(2, 1000.0, 3000.0, static_cast<double>(fConfig->SR()));
 
-    // Find peak
-    int    peakIdx = 0;
-    double peakVal = 0;
-    for (int i = 0; i < nds; ++i)
-      if (hfds[i] > peakVal) { peakVal = hfds[i]; peakIdx = i; }
+    int nfr50 = nbins;  // size of histogram used for fr50 search
+    std::vector<double> hffull(nbins);
+    if (pfxFR50 != pfx) {
+      auto * hhfr50 = (TH1D *)ftmplt->Get(Form("%s%02d", pfxFR50.c_str(), xid));
+      if (!hhfr50) {
+        std::cerr << "[RValueTrigger] ch" << ch
+                  << ": fr50 histogram " << pfxFR50 << Form("%02d", xid) << " not found" << std::endl;
+        ftmplt->Close();
+        return false;
+      }
+      nfr50 = hhfr50->GetNbinsX();
+      std::vector<double> h0fr50(nfr50), hffr50(nfr50);
+      for (int i = 0; i < nfr50; ++i)
+        h0fr50[i] = 0.25 * hhfr50->GetBinContent(i + 1);
+      peakFinder.Filter(nfr50, h0fr50.data(), hffr50.data());
+      hffull = std::move(hffr50);
+    } else {
+      peakFinder.Filter(nbins, h0full.data(), hffull.data());
+    }
 
-    // Find 50% rise (backward from peak)
-    int r50 = peakIdx;
-    for (int i = peakIdx; i > 0; --i)
-      if (hfds[i] < 0.5 * peakVal) { r50 = i; break; }
+    int    maxx = 0;
+    double fmaxv = 0;
+    for (int i = 0; i < nfr50; ++i)
+      if (hffull[i] > fmaxv) { fmaxv = hffull[i]; maxx = i; }
 
-    // Extract raw window: 60 samples before 50% rise, length fNWin (downsampled)
-    int start = r50 - 60;
-    if (start < 0) start = 0;
-    if (start + fNWin > nds) start = nds - fNWin;
+    int fr50 = maxx;
+    for (int i = maxx; i > 0; --i)
+      if (hffull[i] > 0.5 * fmaxv && hffull[i - 1] <= 0.5 * fmaxv) { fr50 = i; break; }
+
+    // Extract raw window: start 60 full-rate samples before 50% rise,
+    // sample every fDS — exactly replicates read_amod.C's htmp0 extraction.
+    int start_full = fr50 - 60;
+    if (start_full < 0) start_full = 0;
+    if (start_full + (fNWin - 1) * fDS >= nbins)
+      start_full = nbins - (fNWin - 1) * fDS - 1;
 
     std::vector<double> htmp(fNWin);
     for (int i = 0; i < fNWin; ++i)
-      htmp[i] = h0ds[start + i];
+      htmp[i] = h0full[start_full + i * fDS];
 
     // Apply batch filter to the extracted window — this is the actual template
     std::vector<double> hftmp(fNWin);
@@ -103,8 +125,9 @@ bool RValueTrigger::PrepareAlgo()
     fTdev[ch].resize(fNWin);
     double asum2 = 0;
     for (int i = 0; i < fNWin; ++i) {
-      fTdev[ch][i] = hftmp[i] - mean;
-      asum2 += fTdev[ch][i] * fTdev[ch][i];
+      double d = hftmp[i] - mean;
+      fTdev[ch][fNWin - 1 - i] = d;   // reversed: aligns with circular-buffer traversal order
+      asum2 += d * d;
     }
     fTstd[ch] = std::sqrt(asum2 / fNWin);
 
@@ -116,9 +139,10 @@ bool RValueTrigger::PrepareAlgo()
 
     // Initialize streaming state
     fFiltBuf[ch].assign(fNWin, 0.0);
+    fBufHead[ch]    = 0;
     fRunSum[ch]     = 0.0;
     fRunSum2[ch]    = 0.0;
-    fDSCounter[ch]  = 0;
+    fDSCounter[ch]  = fDS - 1;
     fWarmupLeft[ch] = fConfig->DLY();
     fRVPrev[ch]     = 0.0;
     fRVPrevPrev[ch] = 0.0;
@@ -133,7 +157,7 @@ bool RValueTrigger::PrepareAlgo()
   return true;
 }
 
-bool RValueTrigger::EvalChannel(int ch, unsigned short adcVal)
+bool RValueTrigger::EvalImpl(int ch, double filterInput)
 {
   // Warmup: count raw samples, suppress trigger decisions until fDLY elapsed
   // (mirrors "nprocessed >= fDELAY" in read_amod.C).
@@ -144,21 +168,25 @@ bool RValueTrigger::EvalChannel(int ch, unsigned short adcVal)
   if (++fDSCounter[ch] < fDS) return false;
   fDSCounter[ch] = 0;
 
-  // Streaming Butterworth filter (baseline already removed)
-  double filt = fFilter[ch].Filter(static_cast<double>(adcVal) - fBaseline[ch]);
+  double filt = fFilter[ch].Filter(filterInput);
 
-  // Slide window: push new sample, drop oldest
-  double dropped = fFiltBuf[ch].back();
-  fFiltBuf[ch].pop_back();
-  fFiltBuf[ch].push_front(filt);
+  // Slide window: decrement head (wrapping), overwrite oldest slot with newest sample.
+  int head = fBufHead[ch];
+  if (--head < 0) head = fNWin - 1;
+  double dropped = fFiltBuf[ch][head];
+  fFiltBuf[ch][head] = filt;
+  fBufHead[ch] = head;
   fRunSum[ch]  += filt - dropped;
   fRunSum2[ch] += filt * filt - dropped * dropped;
 
-  // Cross-correlation with template deviation
-  // fFiltBuf[0]=newest aligns with fTdev[fNWin-1] (template end)
-  double cc = 0;
-  for (int i = 0; i < fNWin; ++i)
-    cc += fFiltBuf[ch][i] * fTdev[ch][fNWin - 1 - i];
+  // Cross-correlation with reversed template: cc = sum_k buf[(head+k)%N] * fTdev[k].
+  // Split into two forward-sequential (cache-friendly) loops to avoid per-iteration modulo.
+  const double * buf  = fFiltBuf[ch].data();
+  const double * tdev = fTdev[ch].data();
+  double cc   = 0;
+  int    cnt1 = fNWin - head;
+  for (int k = 0; k < cnt1; ++k) cc += buf[head + k] * tdev[k];
+  for (int k = 0; k < head;  ++k) cc += buf[k]        * tdev[cnt1 + k];
 
   // Current window std
   double mean  = fRunSum[ch] / fNWin;
@@ -202,4 +230,14 @@ bool RValueTrigger::EvalChannel(int ch, unsigned short adcVal)
   fARVPrev[ch]    = arv;
 
   return fired;
+}
+
+bool RValueTrigger::EvalChannel(int ch, unsigned short adcVal)
+{
+  return EvalImpl(ch, static_cast<double>(adcVal) - fBaseline[ch]);
+}
+
+bool RValueTrigger::EvalChannelD(int ch, double adcVal)
+{
+  return EvalImpl(ch, adcVal - fBaselineD[ch]);
 }
