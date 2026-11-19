@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "AMORE/amoreconsts.hh"
+#include "AMORESystem/TrgCondConf.hh"
 #include "AbsConf.hh"
 
 class AMOREADCConf : public AbsConf {
@@ -63,6 +64,10 @@ public:
   double RVTHRX(int ch) const;
   const std::vector<std::string> & TRGMODEs() const;
 
+  // Signal-path trigger conditions (YAML TRGCOND), used by SignalTrigger
+  void AddTrgCond(const TrgCondConf & cc) { fTrgConds.push_back(cc); }
+  const std::vector<TrgCondConf> & TrgConds() const { return fTrgConds; }
+
   void PrintConf() const override;
 
 private:
@@ -91,6 +96,7 @@ private:
   double fRVTHRX[AMORE::kNCHPERADC]{};  // ellipse ARV² axis threshold
 
   std::vector<std::string> fTRGMODEs{};
+  std::vector<TrgCondConf>  fTrgConds{};  //! not streamed
 
   ClassDef(AMOREADCConf, 1)
 };

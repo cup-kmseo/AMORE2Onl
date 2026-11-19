@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -236,7 +237,83 @@ void AMOREDAQManager::ReadConfigADC(YAML::Node ymlnode)
     if (node["RV_NWIN"])   conf->SetRVNWin(node["RV_NWIN"].as<int>());
     if (node["RV_DS"])     conf->SetRVDS(node["RV_DS"].as<int>());
 
+    if (node["TRGCOND"]) ReadConfigTrgCond(node["TRGCOND"], conf);
+
     fConfigList->Add(conf);
+  }
+}
+
+// TRGCOND: signal-path trigger conditions (SignalTrigger), one map entry per condition.
+//   TRGCOND:
+//     RVH: { ON: [..], THR: [..], THRY: [..], THRX: [..],
+//            BWF: [order, lc, uc], NWIN: n, DS: n, TMPLT_PFX: htmp, FR50_PFX: htmp }
+// Per-crystal arrays (ON/THR/THRY/THRX) have one value per crystal slot of the ADC
+// (NCH/2); a shorter list repeats its last value. Known names set TYPE / TARGET / BIT:
+//   RVH = RV on heat, bit 0;  AMH = AM on heat, bit 1;  RVL = RV on light, bit 2
+// Any other name must give TYPE, TARGET (HEAT|LIGHT) and BIT (n of 1<<n, 0-7).
+void AMOREDAQManager::ReadConfigTrgCond(YAML::Node tnode, AMOREADCConf * conf)
+{
+  if (!tnode.IsMap()) {
+    ERROR("TRGCOND must be a map of condition name -> settings");
+    return;
+  }
+
+  const int nxtal = std::min(AMORE::kNXTALPERADC, std::max(1, conf->NCH() / 2));
+
+  for (const auto & kv : tnode) {
+    TrgCondConf cc;
+    cc.name = kv.first.as<std::string>();
+    const YAML::Node c = kv.second;
+
+    int bitn = -1;
+    if (cc.name == "RVH")      { cc.type = "RV"; cc.target = TrgTarget::kHeat;  bitn = 0; }
+    else if (cc.name == "AMH") { cc.type = "AM"; cc.target = TrgTarget::kHeat;  bitn = 1; }
+    else if (cc.name == "RVL") {
+      cc.type = "RV"; cc.target = TrgTarget::kLight; bitn = 2;
+      cc.tmpltPfx = "ltmp";
+      cc.fr50Pfx  = "htmp";  // light template is cut at the heat 50% rise (read_amod.C)
+    }
+
+    if (c["TYPE"]) cc.type = c["TYPE"].as<std::string>();
+    if (c["TARGET"]) {
+      const std::string t = c["TARGET"].as<std::string>();
+      if (t == "HEAT")       cc.target = TrgTarget::kHeat;
+      else if (t == "LIGHT") cc.target = TrgTarget::kLight;
+      else WARNING("TRGCOND %s: unknown TARGET '%s' (HEAT|LIGHT)", cc.name.c_str(), t.c_str());
+    }
+    if (c["BIT"]) bitn = c["BIT"].as<int>();
+
+    if (cc.type.empty() || bitn < 0 || bitn > 7) {
+      ERROR("TRGCOND %s: TYPE and BIT (0-7) are required for a custom condition",
+            cc.name.c_str());
+      continue;
+    }
+    cc.bit = 1u << bitn;
+
+    FillConfigArray<int>(c["ON"],   nxtal, [&](int i, int v) { cc.on[i]   = v; });
+    FillConfigArray<int>(c["THR"],  nxtal, [&](int i, int v) { cc.thr[i]  = v; });
+    FillConfigArray<int>(c["THRY"], nxtal, [&](int i, int v) { cc.thry[i] = v; });
+    FillConfigArray<int>(c["THRX"], nxtal, [&](int i, int v) { cc.thrx[i] = v; });
+
+    if (c["BWF"]) {
+      const auto b = c["BWF"].as<std::vector<double>>();
+      if (b.size() == 3) {
+        cc.bwfOrder = static_cast<int>(b[0]);
+        cc.bwfLC    = b[1];
+        cc.bwfUC    = b[2];
+      }
+      else ERROR("TRGCOND %s: BWF must be [order, lc, uc]", cc.name.c_str());
+    }
+    if (c["NWIN"])      cc.nwin     = c["NWIN"].as<int>();
+    if (c["DS"])        cc.ds       = c["DS"].as<int>();
+    if (c["TMPLT_PFX"]) cc.tmpltPfx = c["TMPLT_PFX"].as<std::string>();
+    if (c["FR50_PFX"])  cc.fr50Pfx  = c["FR50_PFX"].as<std::string>();
+
+    for (const auto & other : conf->TrgConds()) {
+      if (other.bit == cc.bit)
+        WARNING("TRGCOND %s shares bit 0x%x with %s", cc.name.c_str(), cc.bit, other.name.c_str());
+    }
+    conf->AddTrgCond(cc);
   }
 }
 

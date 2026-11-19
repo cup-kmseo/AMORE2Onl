@@ -48,7 +48,36 @@ bool AbsSWTrigger::Prepare()
 
   InitChannels();
 
+  const int rl = fConfig->RL();
+  fDumpStore.assign(AMORE::kNCHPERADC, std::vector<unsigned short>(rl));
+  fDumpADC.resize(AMORE::kNCHPERADC);
+  for (int ch = 0; ch < AMORE::kNCHPERADC; ++ch) fDumpADC[ch] = fDumpStore[ch].data();
+  fDumpTime.assign(rl, 0);
+
   return PrepareAlgo();
+}
+
+int AbsSWTrigger::DoTriggerXtal(std::vector<XtalTrigger> & out)
+{
+  unsigned long trgtime = 0;
+  bool chbit[AMORE::kNCHPERADC]{};
+
+  const int ret = DoTrigger(trgtime, chbit, fDumpADC.data(), fDumpTime.data());
+  if (ret != 1) return ret;
+
+  const int rl = fConfig->RL();
+  int n = 0;
+  for (int x = 0; x < AMORE::kNXTALPERADC; ++x) {
+    if (!chbit[2 * x]) continue;  // legacy: only phonon channels open a crystal
+    XtalTrigger rec;
+    rec.xtal  = x;
+    rec.ttime = trgtime;
+    rec.phonon.assign(fDumpADC[2 * x],     fDumpADC[2 * x] + rl);
+    rec.photon.assign(fDumpADC[2 * x + 1], fDumpADC[2 * x + 1] + rl);
+    out.push_back(std::move(rec));
+    ++n;
+  }
+  return n;
 }
 
 int AbsSWTrigger::DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned short ** adcval,

@@ -6,6 +6,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include "AMOREAlgs/TriggerManager.hh"
+#include "AMORESystem/AMOREADCConf.hh"
 #include "AMORESystem/AMORETCB.hh"
 #include "CupDAQManager.hh"
 #include "AbsConf.hh"
@@ -50,6 +51,7 @@ private:
 
   void ReadConfigTCB(YAML::Node ymlnode);
   void ReadConfigADC(YAML::Node ymlnode);
+  void ReadConfigTrgCond(YAML::Node tnode, AMOREADCConf * conf);
   void ReadConfigDAQ(YAML::Node ymlnode);
 
   void LaunchDAQServers();

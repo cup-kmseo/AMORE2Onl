@@ -4,10 +4,20 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include "AMORE/amoreconsts.hh"
 #include "AMOREAlgs/ChunkDataFIFO.hh"
 #include "AMORESystem/AMOREADCConf.hh"
+
+// One finalised crystal trigger (channels 2*xtal = phonon, 2*xtal+1 = photon).
+struct XtalTrigger {
+  int           xtal{-1};    // crystal slot on this ADC
+  unsigned long ttime{0};    // time tag of the sample that opened the trigger
+  std::uint32_t trgbit{0};   // signal: fired conditions (bits 0-7) | opening condition(s) << 8
+  std::vector<std::uint16_t> phonon;
+  std::vector<std::uint16_t> photon;
+};
 
 class AbsSWTrigger {
 public:
@@ -38,6 +48,18 @@ public:
   int DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned short ** adcval,
                 unsigned long * timetag = nullptr);
 
+  // Unified output used by TF_SWTrigger: append finalised crystal triggers.
+  // Returns the number appended (> 0), 0 when more data is needed, -1 on FIFO
+  // error / stop. The default adapts the per-channel DoTrigger() of the legacy
+  // triggers (one record per fired phonon channel, trgbit 0).
+  virtual int DoTriggerXtal(std::vector<XtalTrigger> & out);
+
+  // End of run: emit crystals still held back (e.g. inside their dead time).
+  virtual void FlushPending(std::vector<XtalTrigger> & /*out*/) {}
+
+  // True for the pedestal (random) path: its records go to the pedestal group.
+  virtual bool IsPedestal() const { return false; }
+
 protected:
   // Override in subclasses to perform algorithm-specific initialisation.
   // Called by Prepare() after InitFIFO() and InitChannels().
@@ -49,6 +71,12 @@ protected:
 
   void InitFIFO();
   void InitChannels();
+
+  // Full-ADC waveform snapshot buffers (one row per channel, RL samples),
+  // allocated in Prepare().
+  std::vector<std::vector<unsigned short>> fDumpStore;
+  std::vector<unsigned short *>            fDumpADC;
+  std::vector<unsigned long>               fDumpTime;
 
 protected:
   std::string fName{};

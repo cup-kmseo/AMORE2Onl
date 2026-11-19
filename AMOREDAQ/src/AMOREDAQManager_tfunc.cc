@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <memory>
 #include <thread>
 
 #include "ELog.hh"
@@ -161,7 +162,6 @@ void AMOREDAQManager::TF_SWTrigger(int n)
   auto * adc  = fADCList[n].get();
   auto * conf = static_cast<AMOREADCConf *>(adc->GetConfig());
   const int ndp = conf->RL();
-  const int nch = kNCHAMOREADC;
 
   INFO("software trigger for AMOREADC[sid=%d] started.", conf->SID());
   fTrigStatus[n] = RUNNING;
@@ -174,17 +174,32 @@ void AMOREDAQManager::TF_SWTrigger(int n)
   }
   const int ntrg = static_cast<int>(triggers.size());
 
-  // Dump buffers: one row per channel, ndp samples per row
-  std::vector<std::vector<unsigned short>> dumpStorage(nch, std::vector<unsigned short>(ndp));
-  std::vector<unsigned short *> dumpADC(nch);
-  for (int i = 0; i < nch; ++i) dumpADC[i] = dumpStorage[i].data();
+  std::vector<XtalTrigger> recs;
+  recs.reserve(AMORE::kNXTALPERADC);
 
-  std::vector<unsigned long> dumpTime(ndp);
-  bool chbit[kNCHAMOREADC]{};
-  unsigned long trgtime = 0;
+  // Crystal_t carries 2 x kH5AMORENDPMAX waveforms (~2 MB): keep it off the stack.
+  auto xtal = std::make_unique<Crystal_t>();
 
-  std::vector<std::uint16_t> phonon(ndp);
-  std::vector<std::uint16_t> photon(ndp);
+  // Convert finalised crystal triggers of path t to Crystal_t and queue them.
+  auto queueRecords = [&](int t) {
+    for (auto & rec : recs) {
+      const int ch = 2 * rec.xtal;  // phonon channel of this crystal
+
+      xtal->ndp   = static_cast<std::uint16_t>(ndp);
+      xtal->id    = static_cast<std::uint16_t>(conf->PID(ch) / 2);
+      xtal->ttime = rec.ttime;
+      // Signal path: trgbit from its conditions. Legacy per-channel paths (removed
+      // later) keep the old "bit t = path t" marking.
+      xtal->trgbit = rec.trgbit ? rec.trgbit : (1u << t);
+      xtal->SetWaveforms(rec.phonon.data(), rec.photon.data(), ndp);
+      xtal->npulse = static_cast<std::uint16_t>(triggers[t]->CountPulses(ch, rec.phonon.data(), ndp));
+      fTriggeredCrystals.push_back(*xtal);
+
+      std::lock_guard<std::mutex> lock(fMonitorMutex);
+      ++fTriggerNumber;
+    }
+    recs.clear();
+  };
 
   while (true) {
     if (fDoExit || RUNSTATE::CheckError(fRunStatus)) break;
@@ -193,43 +208,12 @@ void AMOREDAQManager::TF_SWTrigger(int n)
     bool allEmpty = true;
 
     for (int t = 0; t < ntrg; ++t) {
-      int ret = triggers[t]->DoTrigger(trgtime, chbit, dumpADC.data(), dumpTime.data());
+      const int ret = triggers[t]->DoTriggerXtal(recs);
 
-      if (ret == 1) {
+      if (ret > 0) {
         anyData = true;
         allEmpty = false;
-        const std::uint32_t pathbit = (1u << t);
-
-        {
-          std::lock_guard<std::mutex> lock(fMonitorMutex);
-          ++fTriggerNumber;
-        }
-
-        for (int i = 0; i < nch; i += 2) {
-          if (!chbit[i]) continue;
-          if (i + 1 >= nch) {
-            WARNING("Channel %02d [sid=%d] has no paired photon channel", i, adc->GetSID());
-            continue;
-          }
-
-          Crystal_t xtal;
-          xtal.ndp    = static_cast<std::uint16_t>(ndp);
-          xtal.id     = static_cast<std::uint16_t>(conf->PID(i) / 2);
-          xtal.ttime  = trgtime;
-          xtal.trgbit = pathbit;
-
-          for (int j = 0; j < ndp; ++j) {
-            phonon[j] = dumpADC[i][j];
-            photon[j] = dumpADC[i + 1][j];
-          }
-
-          xtal.SetWaveforms(phonon.data(), photon.data(), ndp);
-          xtal.npulse = static_cast<std::uint16_t>(triggers[t]->CountPulses(i, phonon.data(), ndp));
-          fTriggeredCrystals.push_back(xtal);
-
-          //INFO("Crystal id=%d [sid=%d] triggered at t=%lu (path %d)",
-          //     xtal.id, adc->GetSID(), trgtime, t);
-        }
+        queueRecords(t);
       }
       else if (ret == 0) {
         if (!(fStreamStatus == ENDED && triggers[t]->IsFIFOEmpty())) allEmpty = false;
@@ -243,6 +227,12 @@ void AMOREDAQManager::TF_SWTrigger(int n)
       if (allEmpty) break;
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+  }
+
+  // Crystals still inside their dead time at the end of the run.
+  for (int t = 0; t < ntrg; ++t) {
+    triggers[t]->FlushPending(recs);
+    queueRecords(t);
   }
 
   INFO("software trigger for AMOREADC[sid=%d] ended.", conf->SID());

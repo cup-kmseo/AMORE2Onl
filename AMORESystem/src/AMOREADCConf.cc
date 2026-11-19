@@ -55,5 +55,18 @@ void AMOREADCConf::PrintConf() const
     std::cout << std::endl;
   }
   std::cout << " -----------------------------------------------" << std::endl;
+  for (const auto & cc : fTrgConds) {
+    std::cout << Form(" ++ TRGCOND %s: type=%s bit=0x%x target=%s", cc.name.c_str(),
+                      cc.type.c_str(), cc.bit, cc.target == TrgTarget::kHeat ? "heat" : "light");
+    if (cc.type == "RV")
+      std::cout << Form(" BWF=(%d, %g, %g) NWIN=%d DS=%d TMPLT=%s FR50=%s", cc.bwfOrder,
+                        cc.bwfLC, cc.bwfUC, cc.nwin, cc.ds, cc.tmpltPfx.c_str(),
+                        cc.fr50Pfx.empty() ? cc.tmpltPfx.c_str() : cc.fr50Pfx.c_str());
+    std::cout << std::endl << "        ON  : ";
+    for (int x = 0; x < AMORE::kNXTALPERADC; x++) std::cout << Form("%6d", cc.on[x]);
+    std::cout << std::endl << "        THR : ";
+    for (int x = 0; x < AMORE::kNXTALPERADC; x++) std::cout << Form("%6d", cc.thr[x]);
+    std::cout << std::endl;
+  }
   std::cout << std::endl;
 }

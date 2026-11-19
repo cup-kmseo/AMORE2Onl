@@ -37,12 +37,6 @@ bool SignalTrigger::PrepareAlgo()
     fXtalDT[x] = std::max(1, fDeadtime[2 * x]);  // crystal dead time = phonon channel DT
   }
 
-  const int rl = fConfig->RL();
-  fDumpStore.assign(AMORE::kNCHPERADC, std::vector<unsigned short>(rl));
-  fDumpADC.resize(AMORE::kNCHPERADC);
-  for (int ch = 0; ch < AMORE::kNCHPERADC; ++ch) fDumpADC[ch] = fDumpStore[ch].data();
-  fDumpTime.assign(rl, 0);
-
   return true;
 }
 
@@ -116,7 +110,7 @@ int SignalTrigger::DoTriggerXtal(std::vector<XtalTrigger> & out)
   }
 }
 
-void SignalTrigger::Flush(std::vector<XtalTrigger> & out)
+void SignalTrigger::FlushPending(std::vector<XtalTrigger> & out)
 {
   for (int x = 0; x < AMORE::kNXTALPERADC; ++x) {
     auto & st = fXtal[x];

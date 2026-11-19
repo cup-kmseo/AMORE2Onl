@@ -6,6 +6,7 @@
 #include "AMOREAlgs/RValueTrigger.hh"
 #include "AMOREAlgs/RandomTrigger.hh"
 #include "AMOREAlgs/RisingEdgeTrigger.hh"
+#include "AMOREAlgs/SignalTrigger.hh"
 #include "AMOREAlgs/TriggerManager.hh"
 
 TriggerManager::TriggerManager()
@@ -27,6 +28,9 @@ TriggerManager::TriggerManager()
 
   RegisterTriggerType("FallingEdgeTrigger",
                       [](const char * name) { return std::make_unique<FallingEdgeTrigger>(name); });
+
+  RegisterTriggerType("SignalTrigger",
+                      [](const char * name) { return std::make_unique<SignalTrigger>(name); });
 }
 
 void TriggerManager::RegisterTriggerType(const std::string & typeName, TriggerCreator creator)
@@ -71,6 +75,8 @@ bool TriggerManager::BuildTriggers(const AbsConfList * confList)
 
       auto trigger = it->second(trgName.c_str());
       trigger->SetConfig(adcConf);
+      if (auto * sig = dynamic_cast<SignalTrigger *>(trigger.get()))
+        sig->SetConditions(adcConf->TrgConds());
       fActivePool[i].push_back(std::move(trigger));
       std::cout << " -> ADC " << i << " path " << j << ": " << trgMode << std::endl;
     }

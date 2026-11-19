@@ -8,6 +8,7 @@ namespace AMORE {
     // Use constexpr for compile-time constants
     inline constexpr int kMINIMUMBCOUNT = 4096; // reading 4 [MB/try] from AMOREADC
     inline constexpr int kNCHPERADC     = 16;
+    inline constexpr int kNXTALPERADC   = kNCHPERADC / 2; // phonon (2i) + photon (2i+1) per crystal
     inline constexpr int kNCRYSTAL      = 18;
     inline constexpr int kNADC          = 3;
 
