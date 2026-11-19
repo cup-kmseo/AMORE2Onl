@@ -39,7 +39,7 @@ target_include_directories ( ${MODULE_NAME}
     ${HDF5_INCLUDE_DIRS}
 )
 
-# Link ROOT, submodule targets, and apply its compile defs
+# Link ROOT, CUPDAQ/CUPDataModel package targets, and apply its compile defs
 target_link_libraries ( ${MODULE_NAME}
     PUBLIC
     yaml-cpp
