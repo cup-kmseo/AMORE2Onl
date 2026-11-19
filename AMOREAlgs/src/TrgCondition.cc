@@ -27,7 +27,7 @@ bool RVCondition::PrepareAlgo()
   par.bwfUC    = fCC.bwfUC;
   par.nwin     = fCC.nwin;
   par.ds       = fCC.ds;
-  par.sr       = static_cast<double>(fADC->SR());
+  par.sr       = fADC->SamplingFreqHz();  // SR is [us / sample]
   par.warmup   = fADC->DLY();
 
   RVTemplateFile tf;
@@ -41,8 +41,9 @@ bool RVCondition::PrepareAlgo()
   for (int x = 0; x < AMORE::kNXTALPERADC; ++x) {
     if (!IsOn(x)) continue;
 
-    // Template histograms are indexed by the target channel's CID (as in RValueTrigger).
-    const int xid = fADC->CID(Channel(x));
+    // Template histograms are indexed by crystal id = PID(phonon ch) / 2, the same id
+    // TF_SWTrigger writes to Crystal_t::id.
+    const int xid = fADC->PID(2 * x) / 2;
 
     std::vector<double> tmpl, fr50;
     if (!tf.Load(fCC.tmpltPfx, xid, tmpl) || (useFR50 && !tf.Load(fCC.fr50Pfx, xid, fr50))) {

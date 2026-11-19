@@ -17,7 +17,7 @@ bool ButterworthTrigger::PrepareAlgo()
   int    order = fConfig->BWFOrder();
   double lc    = fConfig->BWFLC();
   double uc    = fConfig->BWFUC();
-  double sf    = static_cast<double>(fConfig->SR());
+  double sf    = fConfig->SamplingFreqHz();  // SR is [us / sample]
 
   if (lc <= 0 || uc <= lc || sf <= 0) {
     std::cerr << "[ButterworthTrigger] Invalid filter params: "

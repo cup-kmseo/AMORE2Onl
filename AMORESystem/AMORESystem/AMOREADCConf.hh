@@ -45,7 +45,8 @@ public:
   int TRGON(int ch) const;
   int DT(int ch) const;
   int THR(int ch) const;
-  int SR() const;
+  int SR() const;                 // [us / sample]
+  double SamplingFreqHz() const;  // 1e6 / SR
   int RL() const;
   int DLY() const;
   int ZSU() const;
@@ -104,6 +105,8 @@ private:
 inline void AMOREADCConf::SetNCH(int val) { fNCH = val; }
 
 inline void AMOREADCConf::SetSR(int val) { fSR = val; }
+
+inline double AMOREADCConf::SamplingFreqHz() const { return fSR > 0 ? 1e6 / fSR : 0.0; }
 
 inline void AMOREADCConf::SetRL(int val) { fRL = val; }
 

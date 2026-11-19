@@ -136,6 +136,11 @@ void AbsSWTrigger::PushChunkData(unsigned char * data, int ndp)
   fFIFO->PushChunk(data, ndp, fConfig);
 }
 
+void AbsSWTrigger::PushChunkData(unsigned short ** adc, unsigned long * time, int ndp)
+{
+  fFIFO->PushChunk(adc, time, ndp);
+}
+
 int AbsSWTrigger::CountPulses(int ch, const std::uint16_t * wave, int ndp) const
 {
   // Two detection modes:

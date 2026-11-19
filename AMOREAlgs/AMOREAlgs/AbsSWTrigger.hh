@@ -32,6 +32,9 @@ public:
   const char * GetName() const;
 
   virtual void PushChunkData(unsigned char * data, int ndp);
+  // Push an already-decoded chunk (adc[ch][i], time tags in ns); used for replay/tests.
+  void PushChunkData(unsigned short ** adc, unsigned long * time, int ndp);
+  std::size_t GetFIFOQueueSize() const { return fFIFO ? fFIFO->GetQueueSize() : 0; }
 
   void Stop();
   bool IsFIFOEmpty() const;

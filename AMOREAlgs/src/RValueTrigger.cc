@@ -21,7 +21,7 @@ bool RValueTrigger::PrepareAlgo()
   par.bwfUC    = fConfig->BWFUC();
   par.nwin     = fConfig->RVNWin();
   par.ds       = fConfig->RVDS();
-  par.sr       = static_cast<double>(fConfig->SR());
+  par.sr       = fConfig->SamplingFreqHz();  // SR is [us / sample]
   par.warmup   = fConfig->DLY();
 
   RVTemplateFile tf;

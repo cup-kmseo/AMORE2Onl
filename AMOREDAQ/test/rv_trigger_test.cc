@@ -24,13 +24,17 @@
 #include <map>
 #include <memory>
 #include <sstream>
+#include <atomic>
+#include <chrono>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "hdf5.h"
 
 #include "AMORE/amoreconsts.hh"
 #include "AMOREAlgs/RValueTrigger.hh"
+#include "AMOREAlgs/SignalTrigger.hh"
 #include "AMORESystem/AMOREADCConf.hh"
 
 // ---------------------------------------------------------------------------
@@ -398,26 +402,284 @@ static void write_waveforms(
 }
 
 // ---------------------------------------------------------------------------
+// Input conversion shared by the legacy (--quantize) and --signal paths
+// ---------------------------------------------------------------------------
+// --quantize: feed the legacy drivers what the DAQ FIFO holds — integer ADC
+// (raw / 4, unsigned short) and an integer baseline — instead of raw * 0.25.
+static bool g_quantize = false;
+
+static double float_baseline(const ContData * row, int b, int ch)
+{
+  double sum = 0;
+  for (int j = 0; j < 100; ++j) sum += row->adc[b][ch][j] * 0.25;
+  return sum / 100.0;
+}
+
+// Integer baseline as SignalTrigger gets it (AbsSWTrigger::fBaseline is int).
+static int int_baseline(const ContData * row, int b, int ch)
+{
+  long sum = 0;
+  for (int j = 0; j < 100; ++j) sum += row->adc[b][ch][j] / 4;
+  return static_cast<int>(sum / 100);
+}
+
+// ---------------------------------------------------------------------------
+// --signal: replay through ChunkDataFIFO -> SignalTrigger (the DAQ path)
+// ---------------------------------------------------------------------------
+// One SignalTrigger per board with an RVH and an RVL condition, fed by the main
+// thread and consumed by one thread per board (like TF_StreamData / TF_SWTrigger).
+// Synthetic time tags: sample gs -> gs * 10000 ns, so global_sample = ttime / 10000.
+// Output: same stdout columns as the legacy mode (trgbit = fired bits 0-7) plus
+// the opening bits (trgbit >> 8); waveform file has the same /xidNN layout.
+static int run_signal_mode(const ParsedConfig & cfg, const std::vector<std::string> & h5paths,
+                           const std::string & outpath)
+{
+  const int NWIN_H = cfg.nh / cfg.njh;
+  const int NWIN_L = cfg.nl / cfg.njl;
+  const int NTRG4  = NWIN_H - NWIN_L;
+  const double ms_per_sample = 0.01;
+  const int deq_H  = (cfg.rl - cfg.delay) / cfg.njh;
+  const int deq_L  = (cfg.rl - cfg.delay) / cfg.njl;
+  const double t0_corr_h_ms = ((deq_H - 3) * cfg.njh - 1) * ms_per_sample;
+  const double t0_corr_l_ms = ((deq_L - NTRG4 - 1) * cfg.njl - 1) * ms_per_sample;
+
+  const int nb = std::min(cfg.namoreadc, 3);
+  std::unique_ptr<AMOREADCConf>  conf[3];
+  std::unique_ptr<SignalTrigger> st[3];
+  int slot2xid[3][AMORE::kNXTALPERADC];
+
+  for (int b = 0; b < nb; ++b) {
+    for (auto & x : slot2xid[b]) x = -1;
+    if (cfg.boards[b].empty()) continue;
+
+    conf[b] = std::make_unique<AMOREADCConf>();
+    auto & c = *conf[b];
+    c.SetNCH(16);
+    c.SetSR(10);  // [us / sample]
+    c.SetRL(cfg.rl);
+    c.SetDLY(cfg.delay);
+    c.SetRVTmpltFile(cfg.tmplfile);
+
+    TrgCondConf rvh, rvl;
+    rvh.name = "RVH"; rvh.type = "RV"; rvh.bit = TrgBit::kRVH; rvh.target = TrgTarget::kHeat;
+    rvh.bwfOrder = cfg.bwforder; rvh.bwfLC = cfg.bwflc; rvh.bwfUC = cfg.bwfuc;
+    rvh.nwin = NWIN_H; rvh.ds = cfg.njh; rvh.tmpltPfx = "htmp";
+    rvl.name = "RVL"; rvl.type = "RV"; rvl.bit = TrgBit::kRVL; rvl.target = TrgTarget::kLight;
+    rvl.bwfOrder = cfg.bwfl_order; rvl.bwfLC = cfg.bwfl_lc; rvl.bwfUC = cfg.bwfl_uc;
+    rvl.nwin = NWIN_L; rvl.ds = cfg.njl; rvl.tmpltPfx = "ltmp"; rvl.fr50Pfx = "htmp";
+
+    bool anyL = false;
+    for (const auto & ci : cfg.boards[b]) {
+      if (ci.phonon_ch < 0 || ci.phonon_ch % 2 != 0 || ci.photon_ch != ci.phonon_ch + 1) {
+        std::cerr << "board " << b << " xid " << ci.xid
+                  << ": channel pair is not (2x, 2x+1), not supported\n";
+        return 1;
+      }
+      const int x = ci.phonon_ch / 2;
+      slot2xid[b][x] = ci.xid;
+      c.SetPID(2 * x,     2 * ci.xid + 1);  // crystal id = PID / 2 = xid
+      c.SetPID(2 * x + 1, 2 * ci.xid + 2);
+      c.SetDT(2 * x, cfg.dt);               // crystal dead time = phonon channel DT
+      rvh.on[x] = ci.trgon;     rvh.thr[x] = ci.thr;  rvh.thry[x] = ci.thry; rvh.thrx[x] = ci.thrx;
+      rvl.on[x] = ci.trgon_rvl; rvl.thr[x] = ci.thr_rvl;
+      anyL |= ci.trgon_rvl;
+    }
+
+    std::vector<TrgCondConf> conds{rvh};
+    if (anyL) conds.push_back(rvl);
+
+    st[b] = std::make_unique<SignalTrigger>(("Signal_B" + std::to_string(b)).c_str());
+    st[b]->SetConfig(conf[b].get());
+    st[b]->SetConditions(conds);
+    if (!st[b]->Prepare()) { std::cerr << "board " << b << ": Prepare failed\n"; return 1; }
+    std::cerr << "Board " << b << " signal path: " << conds.size() << " condition(s)\n";
+  }
+
+  // --- consumers
+  struct Out { XtalTrigger rec; double rv, arv; };
+  std::vector<Out> outs[3];
+  std::atomic<bool> producerDone{false};
+  std::vector<std::thread> workers;
+  for (int b = 0; b < nb; ++b) {
+    if (!st[b]) continue;
+    workers.emplace_back([&, b]() {
+      std::vector<XtalTrigger> recs;
+      auto take = [&]() {
+        for (auto & r : recs) {
+          double rv = 0, arv = 0;
+          const std::uint32_t open = r.trgbit >> TrgBit::kOpenShift;
+          for (const auto & cond : st[b]->GetConditions()) {
+            if (!(open & cond->Bit())) continue;
+            auto * rc = dynamic_cast<RVCondition *>(cond.get());
+            if (rc) { rv = rc->GetLastRV(r.xtal); arv = rc->GetLastARV(r.xtal); }
+            break;
+          }
+          outs[b].push_back({std::move(r), rv, arv});
+        }
+        recs.clear();
+      };
+      while (true) {
+        const int n = st[b]->DoTriggerXtal(recs);
+        if (n > 0) { take(); continue; }
+        if (n < 0 || (producerDone && st[b]->IsFIFOEmpty())) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+      st[b]->FlushPending(recs);
+      take();
+    });
+  }
+
+  // --- producer
+  hid_t dtype = make_h5_dtype();
+  auto row = std::make_unique<ContData>();
+  std::vector<std::vector<unsigned short>> adc(16, std::vector<unsigned short>(32768));
+  std::vector<unsigned short *> adcp(16);
+  for (int ch = 0; ch < 16; ++ch) adcp[ch] = adc[ch].data();
+  std::vector<unsigned long> tt(32768);
+  double t0_per_board[3] = {};
+  long long global_offset = 0;
+  bool first = true;
+
+  for (const auto & h5path : h5paths) {
+    hid_t fid = H5Fopen(h5path.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (fid < 0) { std::cerr << "Cannot open: " << h5path << "\n"; return 1; }
+    hid_t dset = H5Dopen2(fid, "rawdata", H5P_DEFAULT);
+    hid_t fsp  = H5Dget_space(dset);
+    hsize_t nchunks = 0;
+    H5Sget_simple_extent_dims(fsp, &nchunks, nullptr);
+    hsize_t memdims[1] = {1};
+    hid_t msp = H5Screate_simple(1, memdims, nullptr);
+
+    for (hsize_t ic = 0; ic < nchunks; ++ic) {
+      hsize_t off[1] = {ic}, cnt[1] = {1};
+      H5Sselect_hyperslab(fsp, H5S_SELECT_SET, off, nullptr, cnt, nullptr);
+      H5Dread(dset, dtype, msp, fsp, H5P_DEFAULT, row.get());
+
+      if (first) {
+        for (int b = 0; b < 3; ++b) t0_per_board[b] = row->time[b] * 1e-6;
+        for (int b = 0; b < nb; ++b) {
+          if (!st[b]) continue;
+          int base[AMORE::kNCHPERADC] = {};
+          for (int ch = 0; ch < 16; ++ch) base[ch] = int_baseline(row.get(), b, ch);
+          st[b]->SetBaselines(base, AMORE::kNCHPERADC);
+        }
+        first = false;
+      }
+      if (ic % 200 == 0)
+        std::cerr << "  [" << h5path.substr(h5path.rfind('/') + 1) << "] chunk " << ic << "/"
+                  << nchunks << "  \r" << std::flush;
+
+      const long long gs0 = global_offset + (long long)ic * 32768;
+      for (int j = 0; j < 32768; ++j) tt[j] = (unsigned long)(gs0 + j) * 10000UL;
+
+      for (int b = 0; b < nb; ++b) {
+        if (!st[b]) continue;
+        // keep the FIFO a few chunks ahead of the consumer, bounded in memory
+        while (st[b]->GetFIFOQueueSize() > 3)
+          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        for (int ch = 0; ch < 16; ++ch)
+          for (int j = 0; j < 32768; ++j)
+            adc[ch][j] = static_cast<unsigned short>(row->adc[b][ch][j] / 4);
+        st[b]->PushChunkData(adcp.data(), tt.data(), 32768);
+      }
+    }
+    std::cerr << "\n";
+    global_offset += (long long)nchunks * 32768;
+    H5Sclose(msp); H5Sclose(fsp); H5Dclose(dset); H5Fclose(fid);
+  }
+
+  producerDone = true;
+  for (int b = 0; b < nb; ++b) if (st[b]) st[b]->Stop();
+  for (auto & w : workers) w.join();
+  H5Tclose(dtype);
+
+  // --- report (same columns as legacy mode + opening bits)
+  struct Ev { double trgtime; int board, xid, ch; long long gs; std::uint32_t trgbit; double rv, arv;
+              const std::vector<std::uint16_t> * wvf; };
+  std::vector<Ev> evs;
+  for (int b = 0; b < nb; ++b)
+    for (const auto & o : outs[b]) {
+      const long long gs = static_cast<long long>(o.rec.ttime / 10000UL);
+      const bool openH = (o.rec.trgbit >> TrgBit::kOpenShift) & TrgBit::kRVH;
+      const double tt_ms = t0_per_board[b] + gs * ms_per_sample + (openH ? t0_corr_h_ms : t0_corr_l_ms);
+      evs.push_back({tt_ms, b, slot2xid[b][o.rec.xtal], 2 * o.rec.xtal, gs, o.rec.trgbit, o.rv, o.arv,
+                     &o.rec.phonon});
+    }
+  std::sort(evs.begin(), evs.end(), [](const Ev & a, const Ev & b) { return a.trgtime < b.trgtime; });
+
+  std::cout << "# board xid ch global_sample trgtime_ms trgbit rv arv openbits\n";
+  for (const auto & e : evs)
+    std::cout << e.board << ' ' << e.xid << ' ' << e.ch << ' ' << e.gs << ' ' << std::fixed
+              << std::setprecision(5) << e.trgtime << ' ' << (e.trgbit & TrgBit::kFiredMask) << ' '
+              << std::setprecision(4) << e.rv << ' ' << e.arv << ' '
+              << (e.trgbit >> TrgBit::kOpenShift) << '\n';
+  std::cerr << "Done (signal mode). Total triggers: " << evs.size() << "\n";
+
+  // --- waveforms: heat channel snapshot taken by SignalTrigger at open (ADC/4)
+  std::map<int, std::vector<const Ev *>> by_xid;
+  for (const auto & e : evs) by_xid[e.xid].push_back(&e);
+  hid_t fout = H5Fcreate(outpath.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+  for (auto & [xid, v] : by_xid) {
+    char gname[16];
+    std::snprintf(gname, sizeof(gname), "xid%02d", xid);
+    hid_t grp = H5Gcreate2(fout, gname, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    const hsize_t N = v.size(), RL = cfg.rl;
+    std::vector<double> t(N); std::vector<int> tb(N); std::vector<std::uint16_t> w(N * RL);
+    for (hsize_t i = 0; i < N; ++i) {
+      t[i] = v[i]->trgtime; tb[i] = static_cast<int>(v[i]->trgbit & TrgBit::kFiredMask);
+      std::copy(v[i]->wvf->begin(), v[i]->wvf->end(), w.begin() + i * RL);
+    }
+    hsize_t d1[1] = {N}, d2[2] = {N, RL};
+    hid_t s1 = H5Screate_simple(1, d1, nullptr), s2 = H5Screate_simple(2, d2, nullptr);
+    hid_t ds;
+    ds = H5Dcreate2(grp, "trgtime", H5T_NATIVE_DOUBLE, s1, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    H5Dwrite(ds, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, t.data()); H5Dclose(ds);
+    ds = H5Dcreate2(grp, "trgbit", H5T_NATIVE_INT, s1, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    H5Dwrite(ds, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, tb.data()); H5Dclose(ds);
+    ds = H5Dcreate2(grp, "waveform", H5T_NATIVE_UINT16, s2, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    H5Dwrite(ds, H5T_NATIVE_UINT16, H5S_ALL, H5S_ALL, H5P_DEFAULT, w.data()); H5Dclose(ds);
+    H5Sclose(s1); H5Sclose(s2); H5Gclose(grp);
+  }
+  H5Fclose(fout);
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 int main(int argc, char * argv[])
 {
-  if (argc < 5) {
+  bool signal_mode = false;
+  int  a0 = 1;
+  for (; a0 < argc && argv[a0][0] == '-' && argv[a0][1] == '-'; ++a0) {
+    const std::string opt = argv[a0];
+    if (opt == "--signal")        signal_mode = true;
+    else if (opt == "--quantize") g_quantize  = true;
+    else { std::cerr << "Unknown option " << opt << "\n"; return 1; }
+  }
+  if (argc - a0 < 4) {
     std::cerr << "Usage: " << argv[0]
-              << " <config_file> <template_root_file> <output_h5file>"
-                 " <h5file1> [h5file2 ...]\n";
+              << " [--signal | --quantize] <config_file> <template_root_file> <output_h5file>"
+                 " <h5file1> [h5file2 ...]\n"
+                 "  --quantize  legacy drivers get integer ADC (raw/4) and integer baseline\n"
+                 "  --signal    replay through ChunkDataFIFO -> SignalTrigger (DAQ path)\n";
     return 1;
   }
 
-  const std::string confpath = argv[1];
-  const std::string tmplpath = argv[2];
-  const std::string outpath  = argv[3];
+  const std::string confpath = argv[a0];
+  const std::string tmplpath = argv[a0 + 1];
+  const std::string outpath  = argv[a0 + 2];
   std::vector<std::string> h5paths;
-  for (int i = 4; i < argc; ++i) h5paths.push_back(argv[i]);
+  for (int i = a0 + 3; i < argc; ++i) h5paths.push_back(argv[i]);
 
   ParsedConfig cfg;
   if (!parse_config(confpath, cfg)) return 1;
   cfg.tmplfile = tmplpath;
+
+  if (signal_mode) {
+    print_config(cfg);
+    return run_signal_mode(cfg, h5paths, outpath);
+  }
 
   print_config(cfg);
   std::cerr << "Output: " << outpath << "\n";
@@ -444,7 +706,7 @@ int main(int argc, char * argv[])
 
   for (int b = 0; b < cfg.namoreadc && b < 3; ++b) {
     conf[b] = new AMOREADCConf();
-    conf[b]->SetSR(100000);
+    conf[b]->SetSR(10);  // [us / sample] = 100 kHz
     conf[b]->SetRL(cfg.rl);
     conf[b]->SetDLY(cfg.delay);
     conf[b]->SetBWFOrder(cfg.bwforder);
@@ -484,7 +746,7 @@ int main(int argc, char * argv[])
     if (!board_has_rvl) continue;
 
     conf_l[b] = new AMOREADCConf();
-    conf_l[b]->SetSR(100000);
+    conf_l[b]->SetSR(10);  // [us / sample] = 100 kHz
     conf_l[b]->SetRL(cfg.rl);
     conf_l[b]->SetDLY(cfg.delay);
     conf_l[b]->SetBWFOrder(cfg.bwfl_order);
@@ -565,16 +827,12 @@ int main(int argc, char * argv[])
         double baseline_hd[AMORE::kNCHPERADC] = {};
         double baseline_ld[AMORE::kNCHPERADC] = {};
         for (const auto & ci : cfg.boards[b]) {
-          if (ci.trgon && ci.phonon_ch >= 0) {
-            double sum = 0;
-            for (int j = 0; j < 100; ++j) sum += row->adc[b][ci.phonon_ch][j] * 0.25;
-            baseline_hd[ci.phonon_ch] = sum / 100.0;
-          }
-          if (ci.trgon_rvl && ci.photon_ch >= 0) {
-            double sum = 0;
-            for (int j = 0; j < 100; ++j) sum += row->adc[b][ci.photon_ch][j] * 0.25;
-            baseline_ld[ci.photon_ch] = sum / 100.0;
-          }
+          if (ci.trgon && ci.phonon_ch >= 0)
+            baseline_hd[ci.phonon_ch] = g_quantize ? int_baseline(row, b, ci.phonon_ch)
+                                                   : float_baseline(row, b, ci.phonon_ch);
+          if (ci.trgon_rvl && ci.photon_ch >= 0)
+            baseline_ld[ci.photon_ch] = g_quantize ? int_baseline(row, b, ci.photon_ch)
+                                                   : float_baseline(row, b, ci.photon_ch);
         }
         if (drv[b])   drv[b]->SetBaselinesD(baseline_hd, AMORE::kNCHPERADC);
         if (drv_l[b]) drv_l[b]->SetBaselinesD(baseline_ld, AMORE::kNCHPERADC);
@@ -601,7 +859,8 @@ int main(int argc, char * argv[])
           for (const auto & ci : cfg.boards[b]) {
 
             if (ci.trgon && ci.phonon_ch >= 0 && drv[b]) {
-              double val_h  = row->adc[b][ci.phonon_ch][jbin] * 0.25;
+              double val_h  = g_quantize ? double(row->adc[b][ci.phonon_ch][jbin] / 4)
+                                         : row->adc[b][ci.phonon_ch][jbin] * 0.25;
               bool fired_h  = drv[b]->EvalF(ci.phonon_ch, val_h);
               if (fired_h) {
                 double trgtime = t0_per_board[b] + elapsed_raw + t0_corr_h_ms;
@@ -614,7 +873,8 @@ int main(int argc, char * argv[])
             }
 
             if (ci.trgon_rvl && ci.photon_ch >= 0 && drv_l[b]) {
-              double val_l  = row->adc[b][ci.photon_ch][jbin] * 0.25;
+              double val_l  = g_quantize ? double(row->adc[b][ci.photon_ch][jbin] / 4)
+                                         : row->adc[b][ci.photon_ch][jbin] * 0.25;
               bool fired_l  = drv_l[b]->EvalF(ci.photon_ch, val_l);
               if (fired_l) {
                 double trgtime = t0_per_board[b] + elapsed_raw + t0_corr_l_ms;
