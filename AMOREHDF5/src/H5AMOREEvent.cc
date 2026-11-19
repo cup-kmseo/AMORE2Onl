@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstring>
+#include <string>
 
 #include "TError.h"
 
@@ -14,12 +15,80 @@ H5AMOREEvent::H5AMOREEvent()
 
 H5AMOREEvent::~H5AMOREEvent()
 {
-  Info("~H5AMOREEvent", "enter: fWriteTag=%d fEvtBuf=%zu fChBuf=%zu",
-       (int)fWriteTag, fEvtBuf.size(), fChBuf.size());
-
   if (fWriteTag) { FlushBuffer(); }
+}
 
-  Info("~H5AMOREEvent", "after FlushBuffer");
+bool H5AMOREEvent::CreateGroup(int group)
+{
+  WGroup & g = fW[group];
+  const std::string grp = GroupPath(group);
+
+  htri_t gexists = H5Lexists(fFile, grp.c_str(), H5P_DEFAULT);
+  if (gexists < 0) {
+    Error("Open", "H5Lexists(%s) failed", grp.c_str());
+    return false;
+  }
+  if (gexists == 0) {
+    hid_t gid = H5Gcreate2(fFile, grp.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    if (gid < 0) {
+      Error("Open", "Failed to create group %s", grp.c_str());
+      return false;
+    }
+    H5Gclose(gid);
+  }
+
+  // Extendable 1D datasets for metadata
+  hsize_t dims[1] = {0};
+  hsize_t maxdims[1] = {H5S_UNLIMITED};
+  hid_t space1d = H5Screate_simple(1, dims, maxdims);
+
+  hid_t dcpl1d = H5Pcreate(H5P_DATASET_CREATE);
+  hsize_t chunk1d = (fBufCap > 0) ? static_cast<hsize_t>(fBufCap) : 1024;
+  H5Pset_chunk(dcpl1d, 1, &chunk1d);
+  H5Pset_deflate(dcpl1d, fCompressionLevel);
+
+  g.dsetInfo  = H5Dcreate2(fFile, (grp + "/info").c_str(), fEvtType, space1d, H5P_DEFAULT,
+                           dcpl1d, H5P_DEFAULT);
+  g.dsetIndex = H5Dcreate2(fFile, (grp + "/index").c_str(), H5T_NATIVE_ULLONG, space1d,
+                           H5P_DEFAULT, dcpl1d, H5P_DEFAULT);
+  g.dsetChs   = H5Dcreate2(fFile, (grp + "/chs").c_str(), fChType, space1d, H5P_DEFAULT, dcpl1d,
+                           H5P_DEFAULT);
+
+  H5Pclose(dcpl1d);
+  H5Sclose(space1d);
+
+  // Extendable 2D datasets for dual waveforms (phonon & photon)
+  hsize_t dims2[2] = {0, static_cast<hsize_t>(fNDP)};
+  hsize_t maxdims2[2] = {H5S_UNLIMITED, static_cast<hsize_t>(fNDP)};
+  hid_t space2d = H5Screate_simple(2, dims2, maxdims2);
+
+  hid_t dcpl2d = H5Pcreate(H5P_DATASET_CREATE);
+  // Chunk size along the event axis must be small to avoid huge memory allocation.
+  hsize_t chunk2d[2] = {2, static_cast<hsize_t>(fNDP)};
+  H5Pset_chunk(dcpl2d, 2, chunk2d);
+  H5Pset_deflate(dcpl2d, fCompressionLevel);
+
+  g.dsetPhonon = H5Dcreate2(fFile, (grp + "/phonon").c_str(), H5T_NATIVE_USHORT, space2d,
+                            H5P_DEFAULT, dcpl2d, H5P_DEFAULT);
+  g.dsetPhoton = H5Dcreate2(fFile, (grp + "/photon").c_str(), H5T_NATIVE_USHORT, space2d,
+                            H5P_DEFAULT, dcpl2d, H5P_DEFAULT);
+
+  H5Pclose(dcpl2d);
+  H5Sclose(space2d);
+
+  g.nEvents = 0;
+  g.nCrystals = 0;
+  g.evtBuf.clear();
+  g.chBuf.clear();
+  g.phononBuf.clear();
+  g.photonBuf.clear();
+
+  if (g.dsetInfo < 0 || g.dsetIndex < 0 || g.dsetChs < 0 || g.dsetPhonon < 0 ||
+      g.dsetPhoton < 0) {
+    Error("Open", "Failed to create datasets in %s", grp.c_str());
+    return false;
+  }
+  return true;
 }
 
 void H5AMOREEvent::Open()
@@ -42,71 +111,10 @@ void H5AMOREEvent::Open()
     return;
   }
 
-  // Create /events group
-  {
-    htri_t gexists = H5Lexists(fFile, "/events", H5P_DEFAULT);
-    if (gexists < 0) {
-      Error("Open", "H5Lexists(/events) failed");
-      return;
-    }
-    if (gexists == 0) {
-      hid_t grp_events = H5Gcreate2(fFile, "/events", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-      if (grp_events < 0) {
-        Error("Open", "Failed to create group /events");
-        return;
-      }
-      H5Gclose(grp_events);
-    }
-  }
-
-  // Create extendable 1D datasets for metadata
-  hsize_t dims[1] = {0};
-  hsize_t maxdims[1] = {H5S_UNLIMITED};
-  hid_t space1d = H5Screate_simple(1, dims, maxdims);
-
-  hid_t dcpl1d = H5Pcreate(H5P_DATASET_CREATE);
-  hsize_t chunk1d = (fBufCap > 0) ? static_cast<hsize_t>(fBufCap) : 1024;
-  H5Pset_chunk(dcpl1d, 1, &chunk1d);
-  H5Pset_deflate(dcpl1d, fCompressionLevel);
-
-  fDsetInfo =
-      H5Dcreate2(fFile, "/events/info", fEvtType, space1d, H5P_DEFAULT, dcpl1d, H5P_DEFAULT);
-  fDsetIndex = H5Dcreate2(fFile, "/events/index", H5T_NATIVE_ULLONG, space1d, H5P_DEFAULT, dcpl1d,
-                          H5P_DEFAULT);
-  fDsetChs = H5Dcreate2(fFile, "/events/chs", fChType, space1d, H5P_DEFAULT, dcpl1d, H5P_DEFAULT);
-
-  H5Pclose(dcpl1d);
-  H5Sclose(space1d);
-
-  // Create extendable 2D datasets for dual waveforms (phonon & photon)
-  hsize_t dims2[2] = {0, static_cast<hsize_t>(fNDP)};
-  hsize_t maxdims2[2] = {H5S_UNLIMITED, static_cast<hsize_t>(fNDP)};
-  hid_t space2d = H5Screate_simple(2, dims2, maxdims2);
-
-  hid_t dcpl2d = H5Pcreate(H5P_DATASET_CREATE);
-
-  // CRITICAL TUNING: Chunk size along the event axis must be small to avoid huge memory allocation.
-  // E.g., chunk[0]=2 means 2 * 500,000 * 2 bytes = ~2 MB per chunk block.
-  hsize_t chunk2d[2] = {2, static_cast<hsize_t>(fNDP)};
-  H5Pset_chunk(dcpl2d, 2, chunk2d);
-  H5Pset_deflate(dcpl2d, fCompressionLevel);
-
-  fDsetPhonon = H5Dcreate2(fFile, "/events/phonon", H5T_NATIVE_USHORT, space2d, H5P_DEFAULT, dcpl2d,
-                           H5P_DEFAULT);
-  fDsetPhoton = H5Dcreate2(fFile, "/events/photon", H5T_NATIVE_USHORT, space2d, H5P_DEFAULT, dcpl2d,
-                           H5P_DEFAULT);
-
-  H5Pclose(dcpl2d);
-  H5Sclose(space2d);
+  for (int group = 0; group < kNGroup; ++group)
+    if (!CreateGroup(group)) return;
 
   fMemSize = 0;
-  fTotalEvents = 0;
-  fTotalCrystals = 0;
-
-  fEvtBuf.clear();
-  fChBuf.clear();
-  fPhononBuf.clear();
-  fPhotonBuf.clear();
   fBufCount = 0;
   fBufBytesUsed = 0;
 }
@@ -132,7 +140,8 @@ int H5AMOREEvent::GetNDP()
 
   if (fid < 0) { return 0; }
 
-  hid_t dset = H5Dopen2(fid, "/events/phonon", H5P_DEFAULT);
+  const std::string path = std::string(GroupPath(fReadGroup)) + "/phonon";
+  hid_t dset = H5Dopen2(fid, path.c_str(), H5P_DEFAULT);
   if (dset < 0) { return 0; }
 
   hid_t space = H5Dget_space(dset);
@@ -147,174 +156,126 @@ int H5AMOREEvent::GetNDP()
   return fNDP;
 }
 
-herr_t H5AMOREEvent::FlushBuffer()
+herr_t H5AMOREEvent::FlushGroup(WGroup & g)
 {
-  const std::size_t nEvtBuf = fEvtBuf.size();
-  if (nEvtBuf == 0) {
-    fBufCount = 0;
-    fBufBytesUsed = 0;
-    return 0;
-  }
+  const std::size_t nEvtBuf = g.evtBuf.size();
+  if (nEvtBuf == 0) return 0;
 
-  const std::size_t nChBuf = fChBuf.size();
+  const std::size_t nChBuf = g.chBuf.size();
   herr_t status = 0;
 
-  // 1. Append events info
-  {
-    hsize_t old_dim[1] = {fTotalEvents};
-    hsize_t new_dim[1] = {fTotalEvents + nEvtBuf};
-    H5Dset_extent(fDsetInfo, new_dim);
-
-    hid_t file_space = H5Dget_space(fDsetInfo);
-    hsize_t offset[1] = {old_dim[0]};
-    hsize_t count[1] = {nEvtBuf};
-
+  auto append1d = [&](hid_t dset, hid_t mtype, std::uint64_t old_n, std::size_t n,
+                      const void * buf) -> herr_t {
+    hsize_t new_dim[1] = {old_n + n};
+    H5Dset_extent(dset, new_dim);
+    hid_t file_space = H5Dget_space(dset);
+    hsize_t offset[1] = {old_n};
+    hsize_t count[1] = {n};
     H5Sselect_hyperslab(file_space, H5S_SELECT_SET, offset, nullptr, count, nullptr);
     hid_t mem_space = H5Screate_simple(1, count, nullptr);
-    status = H5Dwrite(fDsetInfo, fEvtType, mem_space, file_space, H5P_DEFAULT, fEvtBuf.data());
-
+    herr_t st = H5Dwrite(dset, mtype, mem_space, file_space, H5P_DEFAULT, buf);
     H5Sclose(mem_space);
     H5Sclose(file_space);
-    if (status < 0) return status;
-  }
+    return st;
+  };
 
-  // 2. Append event index
+  // 1. events info
+  status = append1d(g.dsetInfo, fEvtType, g.nEvents, nEvtBuf, g.evtBuf.data());
+  if (status < 0) return status;
+
+  // 2. event index (first crystal of each event)
   {
     std::vector<std::uint64_t> indexBuf(nEvtBuf);
-    std::uint64_t base = fTotalCrystals;
-    std::uint64_t running = 0;
+    std::uint64_t running = g.nCrystals;
     for (std::size_t i = 0; i < nEvtBuf; ++i) {
-      indexBuf[i] = base + running;
-      running += static_cast<std::uint64_t>(fEvtBuf[i].nhit);
+      indexBuf[i] = running;
+      running += static_cast<std::uint64_t>(g.evtBuf[i].nhit);
     }
-
-    hsize_t old_dim[1] = {fTotalEvents};
-    hsize_t new_dim[1] = {fTotalEvents + nEvtBuf};
-    H5Dset_extent(fDsetIndex, new_dim);
-
-    hid_t file_space = H5Dget_space(fDsetIndex);
-    hsize_t offset[1] = {old_dim[0]};
-    hsize_t count[1] = {nEvtBuf};
-
-    H5Sselect_hyperslab(file_space, H5S_SELECT_SET, offset, nullptr, count, nullptr);
-    hid_t mem_space = H5Screate_simple(1, count, nullptr);
-    status = H5Dwrite(fDsetIndex, H5T_NATIVE_ULLONG, mem_space, file_space, H5P_DEFAULT,
-                      indexBuf.data());
-
-    H5Sclose(mem_space);
-    H5Sclose(file_space);
+    status = append1d(g.dsetIndex, H5T_NATIVE_ULLONG, g.nEvents, nEvtBuf, indexBuf.data());
     if (status < 0) return status;
   }
 
-  // 3. Append channels, phonon, and photon waves
+  // 3. crystal headers and phonon / photon waveforms
   if (nChBuf > 0) {
-    hsize_t old_dim[1] = {fTotalCrystals};
-    hsize_t new_dim[1] = {fTotalCrystals + nChBuf};
-    H5Dset_extent(fDsetChs, new_dim);
-
-    hid_t file_space = H5Dget_space(fDsetChs);
-    hsize_t offset[1] = {old_dim[0]};
-    hsize_t count[1] = {nChBuf};
-
-    H5Sselect_hyperslab(file_space, H5S_SELECT_SET, offset, nullptr, count, nullptr);
-    hid_t mem_space = H5Screate_simple(1, count, nullptr);
-    status = H5Dwrite(fDsetChs, fChType, mem_space, file_space, H5P_DEFAULT, fChBuf.data());
-
-    H5Sclose(mem_space);
-    H5Sclose(file_space);
+    status = append1d(g.dsetChs, fChType, g.nCrystals, nChBuf, g.chBuf.data());
     if (status < 0) return status;
 
-    // Expand 2D datasets
-    hsize_t old_dims[2] = {fTotalCrystals, static_cast<hsize_t>(fNDP)};
-    hsize_t new_dims[2] = {fTotalCrystals + nChBuf, static_cast<hsize_t>(fNDP)};
-    H5Dset_extent(fDsetPhonon, new_dims);
-    H5Dset_extent(fDsetPhoton, new_dims);
+    hsize_t new_dims[2] = {g.nCrystals + nChBuf, static_cast<hsize_t>(fNDP)};
+    H5Dset_extent(g.dsetPhonon, new_dims);
+    H5Dset_extent(g.dsetPhoton, new_dims);
 
-    hsize_t offset_wave[2] = {old_dims[0], 0};
+    hsize_t offset_wave[2] = {g.nCrystals, 0};
     hsize_t count_wave[2] = {nChBuf, static_cast<hsize_t>(fNDP)};
     hid_t mem_space_wave = H5Screate_simple(2, count_wave, nullptr);
 
-    // Write Phonon
-    hid_t file_space_pn = H5Dget_space(fDsetPhonon);
-    H5Sselect_hyperslab(file_space_pn, H5S_SELECT_SET, offset_wave, nullptr, count_wave, nullptr);
-    status = H5Dwrite(fDsetPhonon, H5T_NATIVE_USHORT, mem_space_wave, file_space_pn, H5P_DEFAULT,
-                      fPhononBuf.data());
-    H5Sclose(file_space_pn);
-    if (status < 0) {
-      H5Sclose(mem_space_wave);
-      return status;
+    for (auto [dset, buf] : {std::make_pair(g.dsetPhonon, g.phononBuf.data()),
+                             std::make_pair(g.dsetPhoton, g.photonBuf.data())}) {
+      hid_t file_space = H5Dget_space(dset);
+      H5Sselect_hyperslab(file_space, H5S_SELECT_SET, offset_wave, nullptr, count_wave, nullptr);
+      status = H5Dwrite(dset, H5T_NATIVE_USHORT, mem_space_wave, file_space, H5P_DEFAULT, buf);
+      H5Sclose(file_space);
+      if (status < 0) break;
     }
-
-    // Write Photon
-    hid_t file_space_pt = H5Dget_space(fDsetPhoton);
-    H5Sselect_hyperslab(file_space_pt, H5S_SELECT_SET, offset_wave, nullptr, count_wave, nullptr);
-    status = H5Dwrite(fDsetPhoton, H5T_NATIVE_USHORT, mem_space_wave, file_space_pt, H5P_DEFAULT,
-                      fPhotonBuf.data());
-    H5Sclose(file_space_pt);
-
     H5Sclose(mem_space_wave);
     if (status < 0) return status;
   }
 
-  fTotalEvents += static_cast<std::uint64_t>(nEvtBuf);
-  fTotalCrystals += static_cast<std::uint64_t>(nChBuf);
+  g.nEvents += static_cast<std::uint64_t>(nEvtBuf);
+  g.nCrystals += static_cast<std::uint64_t>(nChBuf);
 
-  fEvtBuf.clear();
-  fChBuf.clear();
-  fPhononBuf.clear();
-  fPhotonBuf.clear();
+  g.evtBuf.clear();
+  g.chBuf.clear();
+  g.phononBuf.clear();
+  g.photonBuf.clear();
+  return status;
+}
+
+herr_t H5AMOREEvent::FlushBuffer()
+{
+  herr_t status = 0;
+  bool wrote = false;
+  for (auto & g : fW) {
+    if (g.evtBuf.empty()) continue;
+    status = FlushGroup(g);
+    if (status < 0) return status;
+    wrote = true;
+  }
+
   fBufCount = 0;
   fBufBytesUsed = 0;
 
-  H5Fflush(fFile, H5F_SCOPE_GLOBAL);
-
+  if (wrote) H5Fflush(fFile, H5F_SCOPE_GLOBAL);
   return status;
+}
+
+void H5AMOREEvent::CloseGroup(WGroup & g)
+{
+  for (hid_t * d : {&g.dsetInfo, &g.dsetIndex, &g.dsetChs, &g.dsetPhonon, &g.dsetPhoton}) {
+    if (*d >= 0) {
+      H5Dclose(*d);
+      *d = H5I_INVALID_HID;
+    }
+  }
 }
 
 void H5AMOREEvent::Close()
 {
   if (fWriteTag) { FlushBuffer(); }
 
-  if (fFileSpaceInfo >= 0) {
-    H5Sclose(fFileSpaceInfo);
-    fFileSpaceInfo = H5I_INVALID_HID;
-  }
-  if (fFileSpaceIndex >= 0) {
-    H5Sclose(fFileSpaceIndex);
-    fFileSpaceIndex = H5I_INVALID_HID;
-  }
-  if (fFileSpaceChs >= 0) {
-    H5Sclose(fFileSpaceChs);
-    fFileSpaceChs = H5I_INVALID_HID;
-  }
-  if (fFileSpacePhonon >= 0) {
-    H5Sclose(fFileSpacePhonon);
-    fFileSpacePhonon = H5I_INVALID_HID;
-  }
-  if (fFileSpacePhoton >= 0) {
-    H5Sclose(fFileSpacePhoton);
-    fFileSpacePhoton = H5I_INVALID_HID;
-  }
+  for (auto & g : fW) CloseGroup(g);
 
-  if (fDsetInfo >= 0) {
-    H5Dclose(fDsetInfo);
-    fDsetInfo = H5I_INVALID_HID;
+  for (hid_t * sp : {&fFileSpaceInfo, &fFileSpaceIndex, &fFileSpaceChs, &fFileSpacePhonon,
+                     &fFileSpacePhoton}) {
+    if (*sp >= 0) {
+      H5Sclose(*sp);
+      *sp = H5I_INVALID_HID;
+    }
   }
-  if (fDsetIndex >= 0) {
-    H5Dclose(fDsetIndex);
-    fDsetIndex = H5I_INVALID_HID;
-  }
-  if (fDsetChs >= 0) {
-    H5Dclose(fDsetChs);
-    fDsetChs = H5I_INVALID_HID;
-  }
-  if (fDsetPhonon >= 0) {
-    H5Dclose(fDsetPhonon);
-    fDsetPhonon = H5I_INVALID_HID;
-  }
-  if (fDsetPhoton >= 0) {
-    H5Dclose(fDsetPhoton);
-    fDsetPhoton = H5I_INVALID_HID;
+  for (hid_t * d : {&fDsetInfo, &fDsetIndex, &fDsetChs, &fDsetPhonon, &fDsetPhoton}) {
+    if (*d >= 0) {
+      H5Dclose(*d);
+      *d = H5I_INVALID_HID;
+    }
   }
 
   fCurrentReadFid = H5I_INVALID_HID;
@@ -337,40 +298,49 @@ void H5AMOREEvent::Close()
   CloseSubRun();
 }
 
-herr_t H5AMOREEvent::AppendEvent(const EventInfo_t & info, const std::vector<Crystal_t> & data)
+herr_t H5AMOREEvent::AppendEvent(const EventInfo_t & info, const std::vector<Crystal_t> & data,
+                                 int group)
 {
   if (!fWriteTag) { return -1; }
+  if (group < 0 || group >= kNGroup) {
+    Error("AppendEvent", "Invalid group: %d", group);
+    return -1;
+  }
   if (fNDP <= 0 || fNDP > kH5AMORENDPMAX) {
     Error("AppendEvent", "Invalid NDP: %d", fNDP);
     return -1;
   }
 
+  WGroup & g = fW[group];
   const std::uint16_t nhit = static_cast<std::uint16_t>(data.size());
 
   EventInfo_t info_local = info;
   info_local.nhit = nhit;
-  fEvtBuf.push_back(info_local);
+  g.evtBuf.push_back(info_local);
 
-  std::size_t addBytes = sizeof(EventInfo_t);
-  // Add metadata size + dual waveform payload size per hit
-  addBytes +=
+  const std::size_t addBytes =
+      sizeof(EventInfo_t) +
       static_cast<std::size_t>(nhit) *
-      (sizeof(CrystalHeader_t) + 2 * static_cast<std::size_t>(fNDP) * sizeof(std::uint16_t));
+          (sizeof(CrystalHeader_t) + 2 * static_cast<std::size_t>(fNDP) * sizeof(std::uint16_t));
 
   for (std::size_t i = 0; i < nhit; ++i) {
     CrystalHeader_t h{};
     h.id = data[i].id;
+    h.ndp = static_cast<std::uint16_t>(fNDP);
     h.ttime = data[i].ttime;
-    fChBuf.push_back(h);
+    h.trgbit = data[i].trgbit;
+    h.npulse = data[i].npulse;
+    g.chBuf.push_back(h);
 
     const std::uint16_t * src_pn = data[i].phonon;
-    fPhononBuf.insert(fPhononBuf.end(), src_pn, src_pn + static_cast<std::size_t>(fNDP));
+    g.phononBuf.insert(g.phononBuf.end(), src_pn, src_pn + static_cast<std::size_t>(fNDP));
 
     const std::uint16_t * src_pt = data[i].photon;
-    fPhotonBuf.insert(fPhotonBuf.end(), src_pt, src_pt + static_cast<std::size_t>(fNDP));
+    g.photonBuf.insert(g.photonBuf.end(), src_pt, src_pt + static_cast<std::size_t>(fNDP));
   }
 
-  UpdateSubRun(info.tnum);
+  // The subrun record follows the signal event numbers.
+  if (group == kSignal) UpdateSubRun(info.tnum);
 
   fMemSize += static_cast<hsize_t>(addBytes);
   fBufCount += 1;
@@ -393,8 +363,8 @@ herr_t H5AMOREEvent::ReadEvent(int n)
   if (fChain && fChain->GetNFile() > 0) { fid = fChain->GetFileId(n, evtno, &file_changed); }
   else {
     fid = fFile;
-    if (fCurrentReadFid != fid) { file_changed = true; }
   }
+  if (fCurrentReadFid != fid) { file_changed = true; }  // new file or read group changed
 
   if (fid < 0) return -1;
 
@@ -415,11 +385,12 @@ herr_t H5AMOREEvent::ReadEvent(int n)
     H5Pset_chunk_cache(dapl, 10007, 256 * 1024 * 1024,
                        1.0); // Increase cache for large AMORE arrays
 
-    fDsetInfo = H5Dopen2(fid, "/events/info", H5P_DEFAULT);
-    fDsetIndex = H5Dopen2(fid, "/events/index", H5P_DEFAULT);
-    fDsetChs = H5Dopen2(fid, "/events/chs", H5P_DEFAULT);
-    fDsetPhonon = H5Dopen2(fid, "/events/phonon", dapl);
-    fDsetPhoton = H5Dopen2(fid, "/events/photon", dapl);
+    const std::string grp = GroupPath(fReadGroup);
+    fDsetInfo = H5Dopen2(fid, (grp + "/info").c_str(), H5P_DEFAULT);
+    fDsetIndex = H5Dopen2(fid, (grp + "/index").c_str(), H5P_DEFAULT);
+    fDsetChs = H5Dopen2(fid, (grp + "/chs").c_str(), H5P_DEFAULT);
+    fDsetPhonon = H5Dopen2(fid, (grp + "/phonon").c_str(), dapl);
+    fDsetPhoton = H5Dopen2(fid, (grp + "/photon").c_str(), dapl);
     H5Pclose(dapl);
 
     if (fDsetInfo < 0 || fDsetIndex < 0 || fDsetChs < 0 || fDsetPhonon < 0 || fDsetPhoton < 0)
@@ -520,6 +491,8 @@ herr_t H5AMOREEvent::ReadEvent(int n)
     for (std::size_t ich = 0; ich < nhit; ++ich) {
       fDataBuf[ich].id = fPrefetchChs[local_ch_idx + ich].id;
       fDataBuf[ich].ttime = fPrefetchChs[local_ch_idx + ich].ttime;
+      fDataBuf[ich].trgbit = fPrefetchChs[local_ch_idx + ich].trgbit;
+      fDataBuf[ich].npulse = fPrefetchChs[local_ch_idx + ich].npulse;
 
       std::uint16_t * dst_pn = fDataBuf[ich].phonon;
       const std::uint16_t * src_pn = &fPrefetchPhonon[(local_ch_idx + ich) * fNDP];

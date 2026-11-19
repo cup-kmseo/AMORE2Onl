@@ -16,7 +16,7 @@ struct Crystal_t {
   std::uint16_t phonon[kH5AMORENDPMAX];
   std::uint16_t photon[kH5AMORENDPMAX];
   std::uint64_t ttime;
-  std::uint32_t trgbit;  // bitmask: bit N set if trigger path N fired
+  std::uint32_t trgbit;  // see CrystalHeader_t::trgbit
   std::uint16_t npulse;  // number of pulses detected in the event window (>=2 means pile-up)
 
   Crystal_t() noexcept
@@ -46,6 +46,8 @@ struct CrystalHeader_t {
   std::uint16_t id;
   std::uint16_t ndp;
   std::uint64_t ttime;
+  std::uint32_t trgbit;  // signal: fired conditions (bits 0-7) | opening condition << 8; pedestal: 0
+  std::uint16_t npulse;  // pulses in the window (>= 2 means pile-up)
 
   static hid_t BuildType();
   hsize_t GetSize() const noexcept;
@@ -111,6 +113,8 @@ inline hid_t CrystalHeader_t::BuildType()
   hid_t type = H5Tcreate(H5T_COMPOUND, sizeof(CrystalHeader_t));
   H5Tinsert(type, "id", HOFFSET(CrystalHeader_t, id), H5T_STD_U16LE);
   H5Tinsert(type, "ttime", HOFFSET(CrystalHeader_t, ttime), H5T_STD_U64LE);
+  H5Tinsert(type, "trgbit", HOFFSET(CrystalHeader_t, trgbit), H5T_STD_U32LE);
+  H5Tinsert(type, "npulse", HOFFSET(CrystalHeader_t, npulse), H5T_STD_U16LE);
   return type;
 }
 

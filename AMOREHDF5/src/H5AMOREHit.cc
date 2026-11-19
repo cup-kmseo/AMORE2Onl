@@ -268,9 +268,12 @@ herr_t H5AMOREHit::AppendHit(const Crystal_t & hit)
   if (!fWriteTag) return -1;
   if (fNDP <= 0 || fNDP > kH5AMORENDPMAX) return -1;
 
-  CrystalHeader_t header;
+  CrystalHeader_t header{};
   header.id = hit.id;
+  header.ndp = hit.ndp;
   header.ttime = hit.ttime;
+  header.trgbit = hit.trgbit;
+  header.npulse = hit.npulse;
 
   fChBuf.push_back(header);
   fPhononBuf.insert(fPhononBuf.end(), hit.phonon, hit.phonon + static_cast<std::size_t>(fNDP));
@@ -390,6 +393,8 @@ herr_t H5AMOREHit::ReadHit(std::uint64_t n)
 
   fCurrentHit.id = fPrefetchChs[local_idx].id;
   fCurrentHit.ttime = fPrefetchChs[local_idx].ttime;
+  fCurrentHit.trgbit = fPrefetchChs[local_idx].trgbit;
+  fCurrentHit.npulse = fPrefetchChs[local_idx].npulse;
 
   std::memcpy(fCurrentHit.phonon, &fPrefetchPhonon[local_idx * fNDP],
               static_cast<std::size_t>(fNDP) * sizeof(std::uint16_t));
