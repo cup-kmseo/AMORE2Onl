@@ -70,7 +70,8 @@ private:
   AMORETCB & fTCB;
 
   TriggerManager fTriggerManager;
-  ConcurrentDeque<Crystal_t> fTriggeredCrystals;
+  ConcurrentDeque<Crystal_t> fTriggeredCrystals;  // signal path -> /events
+  ConcurrentDeque<Crystal_t> fPedestalCrystals;   // pedestal path -> /pedestal
 
   PROCSTATE fStreamStatus;
   PROCSTATE fTrigStatus[AMORE::kNADCAMOREADC];

@@ -188,11 +188,18 @@ void AMOREDAQManager::TF_SWTrigger(int n)
       xtal->ndp   = static_cast<std::uint16_t>(ndp);
       xtal->id    = static_cast<std::uint16_t>(conf->PID(ch) / 2);
       xtal->ttime = rec.ttime;
+      xtal->SetWaveforms(rec.phonon.data(), rec.photon.data(), ndp);
+      xtal->npulse = static_cast<std::uint16_t>(triggers[t]->CountPulses(ch, rec.phonon.data(), ndp));
+
+      if (triggers[t]->IsPedestal()) {
+        xtal->trgbit = 0;
+        fPedestalCrystals.push_back(*xtal);
+        continue;
+      }
+
       // Signal path: trgbit from its conditions. Legacy per-channel paths (removed
       // later) keep the old "bit t = path t" marking.
       xtal->trgbit = rec.trgbit ? rec.trgbit : (1u << t);
-      xtal->SetWaveforms(rec.phonon.data(), rec.photon.data(), ndp);
-      xtal->npulse = static_cast<std::uint16_t>(triggers[t]->CountPulses(ch, rec.phonon.data(), ndp));
       fTriggeredCrystals.push_back(*xtal);
 
       std::lock_guard<std::mutex> lock(fMonitorMutex);

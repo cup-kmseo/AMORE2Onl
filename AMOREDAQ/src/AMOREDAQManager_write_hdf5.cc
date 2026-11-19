@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
@@ -64,44 +65,83 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
     return;
   }
 
-  EventInfo_t eventinfo{};
-  std::vector<Crystal_t> eventdata;
-  eventdata.reserve(8);
+  // One event builder per output group: signal -> /events, pedestal -> /pedestal.
+  struct Builder {
+    int                         group;
+    ConcurrentDeque<Crystal_t> * queue;
+    std::vector<Crystal_t>       data;
+    unsigned long                start{0};
+    bool                         has{false};
+    std::uint64_t                nbuilt{0};
+  };
+  Builder builders[2] = {{H5AMOREEvent::kSignal, &fTriggeredCrystals, {}},
+                         {H5AMOREEvent::kPedestal, &fPedestalCrystals, {}}};
+  for (auto & b : builders) b.data.reserve(8);
 
   double perror = 0.0;
   double integral = 0.0;
 
-  bool hasEvent = false;
-  unsigned long eventStartTime = 0;
-
   fWriteStatus = RUNNING;
 
-  auto flushEvent = [&]() -> bool {
-    eventinfo.tnum  = static_cast<unsigned int>(fNBuiltEvent);
-    eventinfo.ttime = eventStartTime;
-    eventinfo.ttype = 0;
-    eventinfo.nhit  = static_cast<decltype(eventinfo.nhit)>(eventdata.size());
+  auto flushEvent = [&](Builder & b) -> bool {
+    if (!b.has) return true;
+    EventInfo_t info{};
+    info.tnum  = static_cast<unsigned int>(b.nbuilt);
+    info.ttime = b.start;
+    info.ttype = (b.group == H5AMOREEvent::kPedestal) ? 1 : 0;  // CUPDAQ: 1 = pedestal
+    info.nhit  = static_cast<decltype(info.nhit)>(b.data.size());
 
-    herr_t status = h5event->AppendEvent(eventinfo, eventdata);
+    herr_t status = h5event->AppendEvent(info, b.data, b.group);
     if (status < 0) {
-      ERROR("H5AMOREEvent::AppendEvent failed (tnum=%u, nhit=%u)",
-            eventinfo.tnum, eventinfo.nhit);
+      ERROR("H5AMOREEvent::AppendEvent failed (%s tnum=%u, nhit=%u)",
+            H5AMOREEvent::GroupPath(b.group), info.tnum, info.nhit);
       RUNSTATE::SetError(fRunStatus);
       fWriteStatus = PROCSTATE::ERROR;
       return false;
     }
 
-    ++fNBuiltEvent;
-    eventdata.clear();
-    hasEvent = false;
+    ++b.nbuilt;
+    if (b.group == H5AMOREEvent::kSignal) ++fNBuiltEvent;
+    b.data.clear();
+    b.has = false;
     return true;
   };
 
-  while (true) {
+  // Add one crystal to its builder; returns false on write error.
+  auto addCrystal = [&](Builder & b, Crystal_t && crystal) -> bool {
+    if (b.has) {
+      // Crystals from different ADC threads need not arrive in time order:
+      // compare the absolute time difference with the coincidence window.
+      const unsigned long dt = crystal.ttime > b.start ? crystal.ttime - b.start
+                                                       : b.start - crystal.ttime;
+      if (dt <= cw) {
+        // Same crystal and time from another (legacy) path: merge trigger bits
+        for (auto & existing : b.data) {
+          if (existing.id == crystal.id && existing.ttime == crystal.ttime) {
+            existing.trgbit |= crystal.trgbit;
+            return true;
+          }
+        }
+        b.start = std::min(b.start, static_cast<unsigned long>(crystal.ttime));
+        b.data.push_back(std::move(crystal));
+        return true;
+      }
+      if (!flushEvent(b)) return false;
+    }
+    b.start = crystal.ttime;
+    b.has = true;
+    b.data.push_back(std::move(crystal));
+    return true;
+  };
+
+  bool failed = false;
+  while (!failed) {
     if (fDoExit || RUNSTATE::CheckError(fRunStatus)) break;
 
     if (fDoSplitOutputFile) {
-      if (hasEvent && !flushEvent()) break;
+      for (auto & b : builders)
+        if (!flushEvent(b)) failed = true;
+      if (failed) break;
       h5event->Flush();
       fSubRunNumber += 1;
       char newname[512];
@@ -115,13 +155,19 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
       fDoSplitOutputFile = false;
     }
 
-    auto popped = fTriggeredCrystals.pop_front();
+    bool gotAny = false;
+    for (auto & b : builders) {
+      auto popped = b.queue->pop_front();
+      if (!popped) continue;
+      gotAny = true;
+      if (!addCrystal(b, std::move(popped.value()))) { failed = true; break; }
+    }
+    if (failed) break;
 
-    if (!popped) {
-      // Queue empty — check if all triggers are done
-      if (!HasRunningTrigger()) {
-        // Flush last in-progress event
-        if (hasEvent && !flushEvent()) break;
+    if (!gotAny) {
+      // Queues empty — check if all triggers are done
+      if (!HasRunningTrigger() && fTriggeredCrystals.size() == 0 && fPedestalCrystals.size() == 0) {
+        for (auto & b : builders) flushEvent(b);  // last in-progress events
         break;
       }
       h5event->Flush();
@@ -129,36 +175,8 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
       continue;
     }
 
-    Crystal_t crystal = std::move(popped.value());
-
-    if (!hasEvent) {
-      // Start new event
-      eventStartTime = crystal.ttime;
-      hasEvent = true;
-      eventdata.push_back(std::move(crystal));
-    }
-    else if (crystal.ttime - eventStartTime <= cw) {
-      // Within coincidence window — check for duplicate (same id & ttime)
-      bool merged = false;
-      for (auto & existing : eventdata) {
-        if (existing.id == crystal.id && existing.ttime == crystal.ttime) {
-          existing.trgbit |= crystal.trgbit;
-          merged = true;
-          break;
-        }
-      }
-      if (!merged) eventdata.push_back(std::move(crystal));
-    }
-    else {
-      // Outside CW — flush current event and start a new one
-      if (!flushEvent()) break;
-
-      eventStartTime = crystal.ttime;
-      hasEvent = true;
-      eventdata.push_back(std::move(crystal));
-    }
-
-    ThreadSleep(fWriteSleep, perror, integral, fTriggeredCrystals.size());
+    ThreadSleep(fWriteSleep, perror, integral,
+                fTriggeredCrystals.size() + fPedestalCrystals.size());
   }
 
   if (fHDF5File) {
@@ -172,7 +190,8 @@ void AMOREDAQManager::TF_WriteEvent_AMORE()
     fWriteStatus = ENDED;
   }
 
-  INFO("Writing events ended. Total events: %lld", fNBuiltEvent);
+  INFO("Writing events ended. Signal events: %lld, pedestal events: %llu", fNBuiltEvent,
+       static_cast<unsigned long long>(builders[1].nbuilt));
 }
 
 long AMOREDAQManager::OpenNewHDF5File(const char * filename)
