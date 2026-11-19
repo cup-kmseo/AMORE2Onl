@@ -75,12 +75,17 @@ int AbsSWTrigger::DoTrigger(unsigned long & trgtime, bool * trgbit, unsigned sho
     for (int ch = 0; ch < nch; ++ch) {
       if (!fTrgOn[ch]) continue;
 
+      // Always evaluate so stateful algorithms (IIR filters, sliding windows,
+      // previous-sample tracking) keep their state current through dead time,
+      // matching read_amod.C. Only the trigger decision is suppressed.
+      const bool chFired = EvalChannel(ch, binADC[ch]);
+
       if (fDeadtimeCounter[ch] > 0) {
         --fDeadtimeCounter[ch];
         continue;
       }
 
-      if (EvalChannel(ch, binADC[ch])) {
+      if (chFired) {
         fired = true;
         fDeadtimeCounter[ch] = fDeadtime[ch];
         if (trgbit) trgbit[ch] = true;
